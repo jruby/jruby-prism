@@ -1662,11 +1662,6 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private void buildParameters(ParametersNode parameters) {
-        if (parameters == null) {
-            addInstr(new CheckArityInstr(0, 0, false, -1, UndefinedValue.UNDEFINED));
-            return;
-        }
-
         if (parameters.keyword_rest instanceof ForwardingParameterNode) {
             Variable keywords = addResultInstr(new ReceiveKeywordsInstr(temp(), true, true));
             receiveNonBlockArgs(parameters, keywords, true);
