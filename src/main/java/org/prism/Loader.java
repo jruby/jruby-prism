@@ -97,7 +97,7 @@ public class Loader {
         expect((byte) 'M', "incorrect prism header");
 
         expect((byte) 0, "prism version does not match");
-        expect((byte) 19, "prism version does not match");
+        expect((byte) 21, "prism version does not match");
         expect((byte) 0, "prism version does not match");
 
         expect((byte) 1, "Loader.java requires no location fields in the serialized output");
@@ -327,7 +327,7 @@ public class Loader {
             case 13:
                 return new Nodes.BlockLocalVariableNode(loadFlags(), loadConstant(), startOffset, length);
             case 14:
-                return new Nodes.BlockNode(loadConstants(), loadVarUInt(), loadOptionalNode(), loadOptionalNode(), startOffset, length);
+                return new Nodes.BlockNode(loadConstants(), loadOptionalNode(), loadOptionalNode(), startOffset, length);
             case 15:
                 return new Nodes.BlockParameterNode(loadFlags(), loadOptionalConstant(), startOffset, length);
             case 16:
@@ -389,7 +389,7 @@ public class Loader {
             case 44:
                 return new Nodes.ConstantWriteNode(loadConstant(), loadNode(), startOffset, length);
             case 45:
-                return new Nodes.DefNode(buffer.getInt(), loadConstant(), loadOptionalNode(), (Nodes.ParametersNode) loadOptionalNode(), loadOptionalNode(), loadConstants(), loadVarUInt(), startOffset, length);
+                return new Nodes.DefNode(buffer.getInt(), loadConstant(), loadOptionalNode(), (Nodes.ParametersNode) loadOptionalNode(), loadOptionalNode(), loadConstants(), startOffset, length);
             case 46:
                 return new Nodes.DefinedNode(loadNode(), startOffset, length);
             case 47:
@@ -479,7 +479,7 @@ public class Loader {
             case 89:
                 return new Nodes.KeywordRestParameterNode(loadFlags(), loadOptionalConstant(), startOffset, length);
             case 90:
-                return new Nodes.LambdaNode(loadConstants(), loadVarUInt(), loadOptionalNode(), loadOptionalNode(), startOffset, length);
+                return new Nodes.LambdaNode(loadConstants(), loadOptionalNode(), loadOptionalNode(), startOffset, length);
             case 91:
                 return new Nodes.LocalVariableAndWriteNode(loadNode(), loadConstant(), loadVarUInt(), startOffset, length);
             case 92:

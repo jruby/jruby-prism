@@ -56,7 +56,7 @@ project 'JRuby Prism' do
 
   dependencies do
     jar 'org.jruby:jruby-base:9.4.6.0-SNAPSHOT'
-    jar 'com.dylibso.chicory:runtime:999-SNAPSHOT'
+#    jar 'com.dylibso.chicory:runtime:999-SNAPSHOT'
   end
 
   plugin(:jar,

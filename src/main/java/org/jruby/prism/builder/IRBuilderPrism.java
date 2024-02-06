@@ -97,6 +97,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
     // FIXME: Delete once we are no longer depedent on source code
     public void setSourceFrom(IRBuilderPrism other) {
+        if (other.nodeSource == null) throw new RuntimeException("WETF");
         this.nodeSource = other.nodeSource;
         this.source = other.source;
     }
@@ -104,10 +105,6 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     protected void hackPostExeSource(IRBuilder builder) {
         setSourceFrom((IRBuilderPrism) builder);
     }
-
-    // FIXME: Hack around depending on source to compile in prism (remove once source is removalable).
-    //if (prism)
-
 
     // FIXME: Delete once we are no longer depedent on source code
     public void setSourceFrom(Nodes.Source nodeSource, byte[] source) {
@@ -1662,6 +1659,11 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private void buildParameters(ParametersNode parameters) {
+        if (parameters == null) {
+            buildArity(false, false, UndefinedValue.UNDEFINED, 0, -1, 0);
+            return;
+        }
+
         if (parameters.keyword_rest instanceof ForwardingParameterNode) {
             Variable keywords = addResultInstr(new ReceiveKeywordsInstr(temp(), true, true));
             receiveNonBlockArgs(parameters, keywords, true);
@@ -1731,6 +1733,10 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         int keyRest = parameters.keyword_rest == null ? -1 : preCount + optCount + postCount + keywordsCount;
         int requiredCount = preCount + postCount;
 
+        buildArity(hasRest, hasKeywords, keywords, optCount, keyRest, requiredCount);
+    }
+
+    private void buildArity(boolean hasRest, boolean hasKeywords, Operand keywords, int optCount, int keyRest, int requiredCount) {
         // For closures, we don't need the check arity call
         if (scope instanceof IRMethod) {
             // Expensive to do this explicitly?  But, two advantages:
