@@ -9,6 +9,7 @@ import org.jruby.prism.builder.IRBuilderFactoryPrism;
 
 public class ParserProviderPrism implements ParserProvider {
     public Parser getParser(Ruby runtime) {
+        System.out.println("PAALAALAL");
         return new ParserPrism(runtime);
     }
 
