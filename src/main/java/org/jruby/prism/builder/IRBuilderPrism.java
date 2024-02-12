@@ -783,6 +783,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             Node child = children[i];
 
             if (child instanceof SplatNode) {
+                flags[0] |= CALL_SPLATS;
                 builtArgs[i] = new Splat(addResultInstr(new BuildSplatInstr(temp(), build(((SplatNode) child).expression), true)));
             } else if (child instanceof KeywordHashNode && i == numberOfArgs - 1) {
                 builtArgs[i] = buildCallKeywordArguments((KeywordHashNode) children[i], flags); // FIXME: here and possibly AST make isKeywordsHash() method.
