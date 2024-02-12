@@ -21,7 +21,7 @@ public class ParserProviderPrism implements ParserProvider {
         prismLibrary = LibraryLoader.create(ParserBindingPrism.class).load(path);
         // We do something extra here as a side-effect which is how we get an UnsatisfiedLinkError
         // If the library didn't in fact find the .so or has other loading problems.
-        prismLibrary.toString();
+        ParserBindingPrism.Buffer buffer = new ParserBindingPrism.Buffer(jnr.ffi.Runtime.getRuntime(prismLibrary));
     }
 
     public Parser getParser(Ruby runtime) {
