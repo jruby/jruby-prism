@@ -1,7 +1,7 @@
 project 'JRuby Prism' do
   model_version '4.0.0'
   inception_year '2001'
-  id 'org.jruby:jruby-prism', '0.0.1'
+  id 'org.jruby:jruby-prism', '0.21.0'
   inherit 'org.sonatype.oss:oss-parent:7'
   packaging 'pom'
 

@@ -1,6 +1,5 @@
 package org.jruby.prism.parser;
 
-import jnr.ffi.LibraryLoader;
 import org.jcodings.Encoding;
 import org.jcodings.specific.ISO8859_1Encoding;
 import org.jruby.ParseResult;
@@ -14,7 +13,6 @@ import org.jruby.parser.Parser;
 import org.jruby.parser.ParserManager;
 import org.jruby.parser.ParserType;
 import org.jruby.parser.StaticScope;
-import org.jruby.platform.Platform;
 import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -39,30 +37,11 @@ import static org.jruby.parser.ParserType.EVAL;
 import static org.jruby.parser.ParserType.MAIN;
 
 public class ParserPrism extends Parser {
-    static ParserBindingPrism prismLibrary;
+    private final ParserBindingPrism prismLibrary;
 
-    static {
-        String path = System.getProperty("jruby.home") + "/lib/libprism." + getLibraryExtension();
-        try {
-            prismLibrary = LibraryLoader.create(ParserBindingPrism.class).load(path);
-        } catch (UnsatisfiedLinkError e) {
-            // We ignore error and will check nullness of prismLibrary in constructor to know we failed.
-        }
-    }
-
-    public ParserPrism(Ruby runtime) {
+    public ParserPrism(Ruby runtime, ParserBindingPrism prismLibrary) {
         super(runtime);
-
-        if (prismLibrary == null) {
-            throw new UnsatisfiedLinkError("Failed to load libprism." + getLibraryExtension());
-        }
-        //prismWasmWrapper = ParserManager.PARSER_WASM ? new PrismWasmWrapper() : null;
-    }
-
-    private static String getLibraryExtension() {
-        if (Platform.IS_WINDOWS) return "dll";
-        if (Platform.IS_MAC) return "dylib";
-        return "so";
+        this.prismLibrary = prismLibrary;
     }
 
     @Override
