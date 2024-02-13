@@ -1843,7 +1843,9 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             scope.getManager().getRuntime().getWarnings().warn(getFileName(), getLine(node) + 1, "argument of top-level return is ignored");
         }
 
-        return buildReturn(operandListToOperand(buildArguments(node.arguments)), getLine(node));
+        Operand args = node.arguments == null ? nil() : buildYieldArgs(node.arguments.arguments, new int[1]);
+
+        return buildReturn(args, getLine(node));
     }
 
     private Operand buildRestKeywordArgs(KeywordHashNode keywordArgs, int[] flags) {
@@ -1917,14 +1919,6 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             last = buildUndef(name);
         }
         return last;
-    }
-
-    private Operand operandListToOperand(Operand[] args) {
-        switch (args.length) {
-            case 0: return nil();
-            case 1: return args[0];
-            default: return new Array(args);
-        }
     }
 
     private Operand buildUnless(Variable result, UnlessNode node) {
