@@ -1147,8 +1147,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                                 new Operand[]{ buildSelf(), new FrozenString(call.name), fals(), new FrozenString(DefinedMessage.METHOD.getText()) }));
             }
 
-            boolean isAttrAssign = "[]=".equals(call.name.idString());
-            String type = isAttrAssign ? DefinedMessage.ASSIGNMENT.getText() : DefinedMessage.METHOD.getText();
+            String type = DefinedMessage.METHOD.getText();
 
             if (call.receiver == null) { // FCALL
                 /* ------------------------------------------------------------------
@@ -1185,7 +1184,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                                 new Operand[]{
                                         build(call.receiver),
                                         new Symbol(call.name),
-                                        new FrozenString(isAttrAssign ? DefinedMessage.ASSIGNMENT.getText() : DefinedMessage.METHOD.getText())
+                                        new FrozenString(DefinedMessage.METHOD.getText())
                                 }));
                         return buildDefnCheckIfThenPaths(undefLabel, tmpVar);
                     }
