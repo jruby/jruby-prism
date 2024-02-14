@@ -1045,7 +1045,9 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                 node instanceof ClassVariableOperatorWriteNode ||
                 node instanceof GlobalVariableWriteNode || node instanceof MultiWriteNode ||
                 node instanceof InstanceVariableWriteNode || node instanceof IndexAndWriteNode ||
-                node instanceof IndexOrWriteNode || node instanceof IndexOperatorWriteNode) {
+                node instanceof IndexOrWriteNode || node instanceof IndexOperatorWriteNode ||
+                node instanceof CallAndWriteNode || node instanceof CallOrWriteNode ||
+                node instanceof CallOperatorWriteNode) {
             return new FrozenString(DefinedMessage.ASSIGNMENT.getText());
         } else if (node instanceof OrNode || node instanceof AndNode ||
                 node instanceof InterpolatedRegularExpressionNode || node instanceof InterpolatedStringNode) {
