@@ -1033,17 +1033,36 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
     }
 
+    // FIXME: implementation of @@a ||= 1 uses getDefinition to determine it is defined but defined?(@@a ||= 1) is
+    // always defined as "assignment".
+    protected Operand buildGetDefinition2(Node node) {
+        if (node instanceof ClassVariableOrWriteNode) {
+            return buildClassVarGetDefinition(((ClassVariableOrWriteNode) node).name);
+        } else if (node instanceof GlobalVariableOrWriteNode) {
+            return buildGlobalVarGetDefinition(((GlobalVariableOrWriteNode) node).name);
+        } else if (node instanceof ConstantOrWriteNode) {
+            return buildConstantGetDefinition(((ConstantOrWriteNode) node).name);
+        }
+
+        return buildGetDefinition(node);
+    }
     @Override
     protected Operand buildGetDefinition(Node node) {
         if (node == null) return new FrozenString("expression");
 
-        // FIXME: all opassignments needs to return assignment
         if (node instanceof ClassVariableWriteNode ||
-                node instanceof ConstantPathWriteNode || node instanceof LocalVariableWriteNode ||
+                node instanceof ClassVariableAndWriteNode ||
+                node instanceof ClassVariableOperatorWriteNode || node instanceof ClassVariableOrWriteNode ||
+                node instanceof ConstantAndWriteNode || node instanceof ConstantOrWriteNode ||
+                node instanceof ConstantPathWriteNode || node instanceof ConstantWriteNode ||
+                node instanceof InstanceVariableAndWriteNode || node instanceof InstanceVariableOrWriteNode ||
+                node instanceof InstanceVariableOperatorWriteNode ||
+                node instanceof LocalVariableWriteNode ||
                 node instanceof LocalVariableAndWriteNode || node instanceof LocalVariableOrWriteNode ||
                 node instanceof LocalVariableOperatorWriteNode || node instanceof ConstantOperatorWriteNode ||
-                node instanceof ClassVariableOperatorWriteNode ||
-                node instanceof GlobalVariableWriteNode || node instanceof MultiWriteNode ||
+                node instanceof GlobalVariableOrWriteNode || node instanceof GlobalVariableAndWriteNode ||
+                node instanceof GlobalVariableWriteNode || node instanceof GlobalVariableOperatorWriteNode ||
+                node instanceof MultiWriteNode ||
                 node instanceof InstanceVariableWriteNode || node instanceof IndexAndWriteNode ||
                 node instanceof IndexOrWriteNode || node instanceof IndexOperatorWriteNode ||
                 node instanceof CallAndWriteNode || node instanceof CallOrWriteNode ||
@@ -1095,8 +1114,6 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             return tmpVar;
         } else if (node instanceof GlobalVariableReadNode) {
             return buildGlobalVarGetDefinition(((GlobalVariableReadNode) node).name);
-        } else if (node instanceof GlobalVariableOrWriteNode) {
-            return buildGlobalVarGetDefinition(((GlobalVariableOrWriteNode) node).name);
         } else if (node instanceof BackReferenceReadNode) {
             return addResultInstr(
                     new RuntimeHelperCall(
@@ -1120,8 +1137,6 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             return buildInstVarGetDefinition(((InstanceVariableOrWriteNode) node).name);
         } else if (node instanceof ClassVariableReadNode) {
             return buildClassVarGetDefinition(((ClassVariableReadNode) node).name);
-        } else if (node instanceof ClassVariableOrWriteNode) {
-            return buildClassVarGetDefinition(((ClassVariableOrWriteNode) node).name);
         } else if (node instanceof SuperNode) {
             Label undefLabel = getNewLabel();
             Variable tmpVar = addResultInstr(
@@ -1205,8 +1220,6 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                             new Operand[]{buildSelf(), new FrozenString(DefinedMessage.SUPER.getText())}));
         } else if (node instanceof ConstantReadNode) {
             return buildConstantGetDefinition(((ConstantReadNode) node).name);
-        } else if (node instanceof ConstantOrWriteNode) {
-            return buildConstantGetDefinition(((ConstantOrWriteNode) node).name);
         } else if (node instanceof ConstantPathNode) {
             // SSS FIXME: Is there a reason to do this all with low-level IR?
             // Can't this all be folded into a Java method that would be part
@@ -2789,5 +2802,21 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     @Override
     protected Node whenBody(WhenNode arm) {
         return arm.statements;
+    }
+
+    protected Operand buildOpAsgnOrWithDefined(Node definitionNode, VoidCodeBlockOne getter, CodeBlock setter) {
+        Label existsDone = getNewLabel();
+        Label done = getNewLabel();
+        Operand def = buildGetDefinition2(definitionNode);
+        Variable result = def instanceof Variable ? (Variable) def : copy(temp(), def);
+        addInstr(createBranch(result, nil(), existsDone));
+        getter.run(result);
+        addInstr(new LabelInstr(existsDone));
+        addInstr(createBranch(result, getManager().getTrue(), done));
+        Operand value = setter.run();
+        copy(result, value);
+        addInstr(new LabelInstr(done));
+
+        return result;
     }
 }
