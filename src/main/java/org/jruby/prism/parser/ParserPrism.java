@@ -57,8 +57,7 @@ public class ParserPrism extends Parser {
         long time = 0;
 
         if (ParserManager.PARSER_TIMING) time = System.nanoTime();
-        Nodes.Source nodeSource = new Nodes.Source(source);
-        LoaderPrism loader = new LoaderPrism(runtime, serialized, nodeSource);
+        LoaderPrism loader = new LoaderPrism(runtime, serialized, source);
         org.prism.ParseResult res = loader.load();
         Encoding encoding = loader.getEncoding();
 
@@ -72,12 +71,12 @@ public class ParserPrism extends Parser {
 
         if (res.warnings != null) {
             for (org.prism.ParseResult.Warning warning: res.warnings) {
-                runtime.getWarnings().warn(fileName, nodeSource.line(warning.location.startOffset), warning.message);
+                runtime.getWarnings().warn(fileName, res.source.line(warning.location.startOffset), warning.message);
             }
         }
 
         if (res.errors != null && res.errors.length > 0) {
-            int line = nodeSource.line(res.errors[0].location.startOffset);
+            int line = res.source.line(res.errors[0].location.startOffset);
 
             throw runtime.newSyntaxError(fileName + ":" + line + ": " + res.errors[0].message);
         }
@@ -90,7 +89,7 @@ public class ParserPrism extends Parser {
             runtime.defineDATA(RubyIO.newIO(runtime, ChannelHelper.readableChannel(bais)));
         }
 
-        int lineCount = nodeSource.getLineCount();
+        int lineCount = res.source.getLineCount();
         RubyArray lines = getLines(type == EVAL, fileName, lineCount);
         if (lines != null) {  // SCRIPT_DATA__ exists we need source filled in for this parse
             populateScriptData(source, encoding, lines);
@@ -101,13 +100,13 @@ public class ParserPrism extends Parser {
         if (type != EVAL && runtime.getCoverageData().isCoverageEnabled()) {
             int[] coverage = new int[lineCount - 1];
             Arrays.fill(coverage, -1);
-            CoverageLineVisitor visitor = new CoverageLineVisitor(nodeSource, coverage);
+            CoverageLineVisitor visitor = new CoverageLineVisitor(res.source, coverage);
             visitor.defaultVisit(res.value);
             runtime.getCoverageData().prepareCoverage(fileName, coverage);
             coverageMode = runtime.getCoverageData().getMode();
         }
 
-        ParseResultPrism result = new ParseResultPrism(fileName, source, (Nodes.ProgramNode) res.value, nodeSource, encoding, coverageMode);
+        ParseResultPrism result = new ParseResultPrism(fileName, source, (Nodes.ProgramNode) res.value, res.source, encoding, coverageMode);
         if (blockScope != null) {
             if (type == MAIN) { // update TOPLEVEL_BINDNG
                 RubySymbol[] locals = ((Nodes.ProgramNode) result.getAST()).locals;

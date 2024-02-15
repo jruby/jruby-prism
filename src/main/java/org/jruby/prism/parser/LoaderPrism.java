@@ -12,7 +12,7 @@ public class LoaderPrism extends Loader {
 
     private Encoding encoding = null;
 
-    LoaderPrism(Ruby runtime, byte[] serialized, Nodes.Source source) {
+    LoaderPrism(Ruby runtime, byte[] serialized, byte[] source) {
         super(serialized, source);
 
         this.runtime = runtime;

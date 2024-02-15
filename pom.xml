@@ -16,7 +16,7 @@ DO NOT MODIFY - GENERATED CODE
   </parent>
   <groupId>org.jruby</groupId>
   <artifactId>jruby-prism</artifactId>
-  <version>0.21.0</version>
+  <version>0.23.0</version>
   <name>JRuby Prism</name>
   <description>JRuby Prism is a plugin parser for the JRuby project.</description>
   <inceptionYear>2001</inceptionYear>

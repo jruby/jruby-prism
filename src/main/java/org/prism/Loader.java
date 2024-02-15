@@ -7,6 +7,8 @@
 /******************************************************************************/
 package org.prism;
 
+import org.prism.Nodes;
+
 import java.lang.Short;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -18,8 +20,8 @@ import java.util.Locale;
 // @formatter:off
 public class Loader {
 
-    public static ParseResult load(byte[] serialized, Nodes.Source source) {
-        return new Loader(serialized, source).load();
+    public static ParseResult load(byte[] serialized, byte[] sourceBytes) {
+        return new Loader(serialized, sourceBytes).load();
     }
 
     // Overridable methods
@@ -84,9 +86,9 @@ public class Loader {
     protected String encodingName;
     private ConstantPool constantPool;
 
-    protected Loader(byte[] serialized, Nodes.Source source) {
+    protected Loader(byte[] serialized, byte[] sourceBytes) {
         this.buffer = ByteBuffer.wrap(serialized).order(ByteOrder.nativeOrder());
-        this.source = source;
+        this.source = new Nodes.Source(sourceBytes);
     }
 
     protected ParseResult load() {
@@ -96,9 +98,9 @@ public class Loader {
         expect((byte) 'S', "incorrect prism header");
         expect((byte) 'M', "incorrect prism header");
 
-        expect((byte) 0, "prism version does not match");
-        expect((byte) 21, "prism version does not match");
-        expect((byte) 0, "prism version does not match");
+        expect((byte) 0, "prism major version does not match");
+        expect((byte) 23, "prism minor version does not match");
+        expect((byte) 0, "prism patch version does not match");
 
         expect((byte) 1, "Loader.java requires no location fields in the serialized output");
 
@@ -109,6 +111,7 @@ public class Loader {
         this.encodingName = new String(encodingNameBytes, StandardCharsets.US_ASCII);
 
         source.setStartLine(loadVarSInt());
+        source.setLineOffsets(loadLineOffsets());
 
         ParseResult.MagicComment[] magicComments = loadMagicComments();
         Nodes.Location dataLocation = loadOptionalLocation();
@@ -130,7 +133,7 @@ public class Loader {
         MarkNewlinesVisitor visitor = new MarkNewlinesVisitor(source, newlineMarked);
         node.accept(visitor);
 
-        return new ParseResult(node, magicComments, dataLocation, errors, warnings);
+        return new ParseResult(node, magicComments, dataLocation, errors, warnings, source);
     }
 
     private byte[] loadEmbeddedString() {
@@ -153,6 +156,15 @@ public class Loader {
             default:
                 throw new Error("Expected 0 or 1 but was " + buffer.get());
         }
+    }
+
+    private int[] loadLineOffsets() {
+        int count = loadVarUInt();
+        int[] lineOffsets = new int[count];
+        for (int i = 0; i < count; i++) {
+            lineOffsets[i] = loadVarUInt();
+        }
+        return lineOffsets;
     }
 
     private ParseResult.MagicComment[] loadMagicComments() {
