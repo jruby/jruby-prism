@@ -64,8 +64,8 @@ public class ParserPrism extends Parser {
         if (ParserManager.PARSER_TIMING) {
             ParserStats stats = runtime.getParserManager().getParserStats();
 
-            stats.addYARPTimeDeserializing(System.nanoTime() - time);
-            stats.addYARPSerializedBytes(serialized.length);
+            stats.addPrismTimeDeserializing(System.nanoTime() - time);
+            stats.addPrismSerializedBytes(serialized.length);
             stats.addParsedBytes(source.length);
         }
 
@@ -180,7 +180,7 @@ public class ParserPrism extends Parser {
         if (ParserManager.PARSER_TIMING) {
             ParserStats stats = runtime.getParserManager().getParserStats();
 
-            stats.addYARPTimeCParseSerialize(System.nanoTime() - time);
+            stats.addPrismTimeCParseSerialize(System.nanoTime() - time);
         }
 
         int length = buffer.length.intValue();
