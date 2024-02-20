@@ -1590,7 +1590,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
     private Operand buildMatchPredicate(MatchPredicateNode node) {
         Variable result = copy(tru());
-        buildPatternMatch(result, copy(nil()), copy(nil()), node.value, build(node.pattern), false, true, copy(nil()));
+        buildPatternMatch(result, copy(nil()), copy(nil()), node.pattern, build(node.value), false, true, copy(nil()));
         return result;
     }
 
