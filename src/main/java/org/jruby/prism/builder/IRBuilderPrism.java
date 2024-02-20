@@ -558,7 +558,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildBreak(BreakNode node) {
-        return buildBreak(() -> buildArgumentsAsArgument(node.arguments), getLine(node));
+        return buildBreak(() -> node.arguments == null ? nil() : buildYieldArgs(node.arguments.arguments, new int[1]), getLine(node));
     }
 
     private Operand buildBegin(BeginNode node) {
@@ -2329,7 +2329,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         } else {
             rhs = subArray(operands, lastSplat + 1, length);
         }
-        return addResultInstr(new BuildCompoundArrayInstr(temp(), operands[lastSplat], rhs, false, (flags[0] & CALL_KEYWORD_REST) != 0));
+        return addResultInstr(new BuildCompoundArrayInstr(temp(), operands[lastSplat], rhs, (flags[0] & CALL_KEYWORD_REST) != 0, (flags[0] & CALL_KEYWORD_REST) != 0));
     }
 
     private Operand catArgs(Operand[] args, int start, int length, Operand splat, int[] flags) {
