@@ -12,6 +12,7 @@ import org.jruby.RubyBignum;
 import org.jruby.RubyFloat;
 import org.jruby.RubyKernel;
 import org.jruby.RubyNumeric;
+import org.jruby.RubyString;
 import org.jruby.RubySymbol;
 import org.jruby.compiler.NotCompilableException;
 import org.jruby.ir.IRClosure;
@@ -75,6 +76,8 @@ import static org.jruby.ir.instructions.RuntimeHelperCall.Methods.*;
 import static org.jruby.runtime.CallType.VARIABLE;
 import static org.jruby.runtime.ThreadContext.*;
 import static org.jruby.util.CommonByteLists.*;
+import static org.jruby.util.RubyStringBuilder.inspectIdentifierByteList;
+import static org.jruby.util.RubyStringBuilder.str;
 import static org.jruby.util.StringSupport.CR_UNKNOWN;
 
 public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNode, ConstantPathNode, HashPatternNode> {
@@ -2790,6 +2793,12 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                         SymbolFlags.isForcedBinaryEncoding(flags) ? ASCIIEncoding.INSTANCE :
                                 getEncoding();
         ByteList bytelist = new ByteList(node.unescaped, encoding);
+
+        // FIXME: This should be done by prism.
+        if (RubyString.scanForCodeRange(bytelist) == StringSupport.CR_BROKEN) {
+            Ruby runtime = getManager().getRuntime();
+            throw runtime.newEncodingError(str(runtime, "invalid symbol in encoding " + getEncoding() + " :\"", inspectIdentifierByteList(runtime, bytelist), "\""));
+        }
 
         return symbol(bytelist);
     }
