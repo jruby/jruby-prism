@@ -438,6 +438,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         Operand[] elts = new Operand[children.length];
         Variable result = temp();
         int splatIndex = -1;
+        Operand keywordRestSplat = null;
 
         for (int i = 0; i < children.length; i++) {
             Node child = children[i];
@@ -463,11 +464,21 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                     addResultInstr(new BuildCompoundArrayInstr(result, result, build(((SplatNode) child).expression), false, false));
                 }
                 splatIndex = i;
+            } else if (child instanceof KeywordHashNode) {
+                keywordRestSplat = build(child);
+                elts[i] = keywordRestSplat;
             } else {
                 elts[i] = build(child);
             }
         }
 
+        if (keywordRestSplat != null) {
+            Variable test = addResultInstr(new RuntimeHelperCall(temp(), IS_HASH_EMPTY, new Operand[]{ keywordRestSplat }));
+            if_else(test, tru(),
+                    () -> copy(result, new Array(removeArg(elts))),
+                    () -> copy(result, new Array(elts)));
+            return result;
+        }
         // FIXME: Can we just return the operand only in this case.
         // No splats present.  Just make a simple array Operand.
         if (splatIndex == -1) return copy(result, new Array(elts));
