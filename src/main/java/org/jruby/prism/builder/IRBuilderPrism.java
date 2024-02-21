@@ -1690,7 +1690,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
     private void buildParameters(ParametersNode parameters) {
         if (parameters == null) {
-            buildArity(false, false, UndefinedValue.UNDEFINED, 0, -1, 0);
+            Variable keywords = addResultInstr(new ReceiveKeywordsInstr(temp(), false, false));
+            buildArity(false, false, keywords, 0, -1, 0);
             return;
         }
 
