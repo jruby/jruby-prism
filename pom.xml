@@ -62,7 +62,6 @@
 
   <build>
     <sourceDirectory>src/main/java</sourceDirectory>
-    <testSourceDirectory>test</testSourceDirectory>
     <finalName>jruby-prism</finalName>
     <extensions>
       <extension>
@@ -154,64 +153,6 @@
                    </goals>
                 </execution>
              </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-
-    <profile>
-      <id>release-on-9</id>
-      <activation>
-        <jdk>[9,)</jdk>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <artifactId>maven-compiler-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>compile9</id>
-                <goals>
-                  <goal>compile</goal>
-                </goals>
-                <configuration>
-                  <release>9</release>
-                  <includes>
-                    <include>module-info.java</include>
-                  </includes>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <artifactId>maven-source-plugin</artifactId>
-            <version>2.2.1</version>
-            <executions>
-              <execution>
-                <id>attach-sources</id>
-                <goals>
-                  <goal>jar</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <artifactId>maven-javadoc-plugin</artifactId>
-            <version>3.0.1</version>
-            <executions>
-              <execution>
-                <id>attach-javadocs</id>
-                <goals>
-                  <goal>jar</goal>
-                </goals>
-              </execution>
-            </executions>
-            <configuration>
-              <additionalJOption>-Xdoclint:none</additionalJOption>
-              <additionalOptions>-html5</additionalOptions>
-              <quiet>true</quiet>
-              <detectJavaApiLink>false</detectJavaApiLink>
-            </configuration>
           </plugin>
         </plugins>
       </build>
