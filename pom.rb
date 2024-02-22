@@ -63,12 +63,14 @@ project 'JRuby Prism' do
          archive: {manifestEntries: {'Automatic-Module-Name' => 'org.jruby'}})
 
   plugin_management do
+    plugin :compiler, '3.8.1'
     plugin :source, '3.2.1'
     plugin :install, '3.0.0-M1'
     plugin :deploy, '3.0.0-M1'
     plugin :javadoc, '3.2.0'
     plugin :release, '3.0.0-M1'
     plugin :resources, '3.2.0'
+    plugin :jar, '3.2.0'
   end
 
   plugin( :compiler,
@@ -83,7 +85,6 @@ project 'JRuby Prism' do
   end
 
   profile 'release' do
-    modules [ 'maven' ]
     properties 'invoker.skip' => true
     plugin(:source) do
       execute_goals('jar-no-fork', :id => 'attach-sources')

@@ -131,6 +131,10 @@ DO NOT MODIFY - GENERATED CODE
     <pluginManagement>
       <plugins>
         <plugin>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.8.1</version>
+        </plugin>
+        <plugin>
           <artifactId>maven-source-plugin</artifactId>
           <version>3.2.1</version>
         </plugin>
@@ -152,6 +156,10 @@ DO NOT MODIFY - GENERATED CODE
         </plugin>
         <plugin>
           <artifactId>maven-resources-plugin</artifactId>
+          <version>3.2.0</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-jar-plugin</artifactId>
           <version>3.2.0</version>
         </plugin>
       </plugins>
@@ -222,9 +230,6 @@ DO NOT MODIFY - GENERATED CODE
           </plugin>
         </plugins>
       </build>
-      <modules>
-        <module>maven</module>
-      </modules>
       <properties>
         <invoker.skip>true</invoker.skip>
       </properties>
