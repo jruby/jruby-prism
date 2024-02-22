@@ -1,7 +1,7 @@
 project 'JRuby Prism' do
   model_version '4.0.0'
   inception_year '2001'
-  id 'org.jruby:jruby-prism', '0.24.0-SNAPSHOT'
+  id 'org.jruby:jruby-prism', '0.24.0'
   inherit 'org.sonatype.oss:oss-parent:7'
   packaging 'pom'
 
@@ -81,6 +81,19 @@ project 'JRuby Prism' do
           'useIncrementalCompilation' =>  'false' ) do
     execute_goals( 'compile')
   end
+
+  profile 'release' do
+    modules [ 'maven' ]
+    properties 'invoker.skip' => true
+    plugin(:source) do
+      execute_goals('jar-no-fork', :id => 'attach-sources')
+    end
+    plugin(:javadoc) do
+      execute_goals('jar', :id => 'attach-javadocs')
+      configuration(doclint: 'none')
+    end
+  end
+
 
   build do
     default_goal 'package'
