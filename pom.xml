@@ -1,221 +1,203 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!--
-
-
-DO NOT MODIFY - GENERATED CODE
-
-
--->
-<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<?xml version="1.0" ?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
+  <groupId>org.jruby</groupId>
+  <artifactId>jruby-prism</artifactId>
+  <packaging>jar</packaging>
+  <version>0.24.0-SNAPSHOT</version>
+  <name>jruby-prism</name>
+  <description>
+    Java portion of JRuby Prism parser support.
+  </description>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
   <parent>
     <groupId>org.sonatype.oss</groupId>
     <artifactId>oss-parent</artifactId>
     <version>7</version>
   </parent>
-  <groupId>org.jruby</groupId>
-  <artifactId>jruby-prism</artifactId>
-  <version>0.24.0</version>
-  <name>JRuby Prism</name>
-  <description>JRuby Prism is a plugin parser for the JRuby project.</description>
-  <inceptionYear>2001</inceptionYear>
-  <organization>
-    <name>JRuby</name>
-    <url>https://www.jruby.org</url>
-  </organization>
+
+  <issueManagement>
+    <system>GitHub</system>
+    <url>https://github.com/jruby/jruby-prism/issues</url>
+  </issueManagement>
+
+  <scm>
+    <connection>scm:git:https://github.com/jruby/jruby-prism.git</connection>
+    <developerConnection>scm:git:git@github.com:jruby/jruby-prism.git</developerConnection>
+    <url>https://github.com/jruby/jruby-prism</url>
+  </scm>
+
   <licenses>
-    <license>
-      <name>GPL-2.0</name>
-      <url>http://www.gnu.org/licenses/gpl-2.0-standalone.html</url>
-    </license>
-    <license>
-      <name>LGPL-2.1</name>
-      <url>http://www.gnu.org/licenses/lgpl-2.1-standalone.html</url>
-    </license>
     <license>
       <name>EPL-2.0</name>
       <url>http://www.eclipse.org/legal/epl-v20.html</url>
     </license>
   </licenses>
+
   <developers>
     <developer>
-      <id>enebo</id>
-      <name>enebo</name>
-      <roles>
-        <role>developer</role>
-      </roles>
+      <id>lopex</id>
+      <name>Thomas Enebo</name>
+      <email>tom.enebo@gmail.com</email>
     </developer>
   </developers>
-  <mailingLists>
-    <mailingList>
-      <name>jruby</name>
-      <archive>https://github.com/jruby/jruby/wiki/MailingLists</archive>
-    </mailingList>
-  </mailingLists>
-  <scm>
-    <connection>scm:git:git@jruby.org:jruby.git</connection>
-    <developerConnection>scm:git:ssh://git@jruby.org/jruby.git</developerConnection>
-    <url>https://github.com/jruby/jruby</url>
-  </scm>
-  <issueManagement>
-    <system>GitHub</system>
-    <url>https://github.com/jruby/jruby_prism/issues</url>
-  </issueManagement>
-  <distributionManagement>
-    <site>
-      <id>gh-pages</id>
-      <name>JRuby Site</name>
-      <url>https://github.com/jruby/jruby</url>
-    </site>
-  </distributionManagement>
-  <properties>
-    <base.java.version>1.8</base.java.version>
-    <base.javac.version>1.8</base.javac.version>
-    <build.date>${maven.build.timestamp}</build.date>
-    <create.sources.jar>true</create.sources.jar>
-    <maven.build.timestamp.format>yyyy-MM-dd</maven.build.timestamp.format>
-    <polyglot.dump.pom>pom.xml</polyglot.dump.pom>
-    <polyglot.dump.readonly>true</polyglot.dump.readonly>
-  </properties>
+
   <dependencies>
     <dependency>
-      <groupId>org.jruby</groupId>
-      <artifactId>jruby-base</artifactId>
-      <version>9.4.6.0-SNAPSHOT</version>
+       <groupId>org.jruby</groupId>
+       <artifactId>jruby-base</artifactId>
+       <version>9.4.6.0</version>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.13.1</version>
+      <scope>test</scope>
     </dependency>
   </dependencies>
-  <repositories>
-    <repository>
-      <releases>
-        <enabled>false</enabled>
-      </releases>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-      <id>sonatype</id>
-      <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
-    </repository>
-  </repositories>
-  <pluginRepositories>
-    <pluginRepository>
-      <releases>
-        <enabled>false</enabled>
-      </releases>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-      <id>sonatype</id>
-      <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
-    </pluginRepository>
-  </pluginRepositories>
+
   <build>
-    <defaultGoal>package</defaultGoal>
-    <resources>
-      <resource>
-        <directory>src/main/java</directory>
-      </resource>
-      <resource>
-        <directory>src/main/resources</directory>
-        <includes>
-          <include>META-INF/**/*</include>
-        </includes>
-      </resource>
-      <resource>
-        <directory>src/main/resources/wasm</directory>
-        <includes>
-          <include>**/*wasm</include>
-        </includes>
-      </resource>
-    </resources>
-    <pluginManagement>
-      <plugins>
-        <plugin>
-          <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.8.1</version>
-        </plugin>
-        <plugin>
-          <artifactId>maven-source-plugin</artifactId>
-          <version>3.2.1</version>
-        </plugin>
-        <plugin>
-          <artifactId>maven-install-plugin</artifactId>
-          <version>3.0.0-M1</version>
-        </plugin>
-        <plugin>
-          <artifactId>maven-deploy-plugin</artifactId>
-          <version>3.0.0-M1</version>
-        </plugin>
-        <plugin>
-          <artifactId>maven-javadoc-plugin</artifactId>
-          <version>3.2.0</version>
-        </plugin>
-        <plugin>
-          <artifactId>maven-release-plugin</artifactId>
-          <version>3.0.0-M1</version>
-        </plugin>
-        <plugin>
-          <artifactId>maven-resources-plugin</artifactId>
-          <version>3.2.0</version>
-        </plugin>
-        <plugin>
-          <artifactId>maven-jar-plugin</artifactId>
-          <version>3.2.0</version>
-        </plugin>
-      </plugins>
-    </pluginManagement>
+    <sourceDirectory>src</sourceDirectory>
+    <testSourceDirectory>test</testSourceDirectory>
+    <finalName>jruby-prism</finalName>
+    <extensions>
+      <extension>
+        <groupId>org.apache.maven.wagon</groupId>
+        <artifactId>wagon-webdav</artifactId>
+      </extension>
+    </extensions>
     <plugins>
       <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
-        <configuration>
-          <archive>
-            <manifestEntries>
-              <Automatic-Module-Name>org.jruby</Automatic-Module-Name>
-            </manifestEntries>
-          </archive>
-        </configuration>
-      </plugin>
-      <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.8.0</version>
+        <configuration>
+          <source>1.7</source>
+          <target>1.7</target>
+        </configuration>
         <executions>
           <execution>
-            <goals>
-              <goal>compile</goal>
-            </goals>
+            <id>default-compile</id>
+            <configuration>
+              <excludes>
+                <exclude>module-info.java</exclude>
+              </excludes>
+            </configuration>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.22.0</version>
+      </plugin>
+      <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>2.2</version>
         <configuration>
-          <encoding>utf-8</encoding>
-          <verbose>false</verbose>
-          <showWarnings>true</showWarnings>
-          <showDeprecation>true</showDeprecation>
-          <source>${base.java.version}</source>
-          <source>1.8</source>
-          <target>${base.javac.version}</target>
-          <target>1.8</target>
-          <useIncrementalCompilation>false</useIncrementalCompilation>
+          <archive>
+            <manifestFile>MANIFEST.MF</manifestFile>
+          </archive>
         </configuration>
       </plugin>
     </plugins>
   </build>
   <profiles>
     <profile>
-      <id>release</id>
+      <id>jacoco</id>
       <build>
         <plugins>
           <plugin>
+             <groupId>org.jacoco</groupId>
+             <artifactId>jacoco-maven-plugin</artifactId>
+             <version>0.8.0</version>
+             <configuration>
+                <excludes>
+                </excludes>
+             </configuration>
+             <executions>
+                <execution>
+                    <id>default-prepare-agent</id>
+                    <goals>
+                        <goal>prepare-agent</goal>
+                    </goals>
+                </execution>
+                <execution>
+                   <id>pre-unit-test</id>
+                   <goals>
+                      <goal>prepare-agent</goal>
+                   </goals>
+                   <configuration>
+                      <destFile>${project.build.directory}/coverage-reports/jacoco.exec</destFile>
+                      <propertyName>surefireArgLine</propertyName>
+                   </configuration>
+                </execution>
+                <execution>
+                   <id>post-unit-test</id>
+                   <phase>test</phase>
+                   <goals>
+                      <goal>report</goal>
+                   </goals>
+                   <configuration>
+                      <dataFile>${project.build.directory}/coverage-reports/jacoco.exec</dataFile>
+                      <outputDirectory>${project.reporting.outputDirectory}/jacoco</outputDirectory>
+                   </configuration>
+                </execution>
+                <execution>
+                   <id>default-report</id>
+                   <phase>prepare-package</phase>
+                   <goals>
+                      <goal>report</goal>
+                   </goals>
+                </execution>
+             </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <profile>
+      <id>release-on-9</id>
+      <activation>
+        <jdk>[9,)</jdk>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>compile9</id>
+                <goals>
+                  <goal>compile</goal>
+                </goals>
+                <configuration>
+                  <release>9</release>
+                  <includes>
+                    <include>module-info.java</include>
+                  </includes>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
             <artifactId>maven-source-plugin</artifactId>
+            <version>2.2.1</version>
             <executions>
               <execution>
                 <id>attach-sources</id>
                 <goals>
-                  <goal>jar-no-fork</goal>
+                  <goal>jar</goal>
                 </goals>
               </execution>
             </executions>
           </plugin>
           <plugin>
             <artifactId>maven-javadoc-plugin</artifactId>
+            <version>3.0.1</version>
             <executions>
               <execution>
                 <id>attach-javadocs</id>
@@ -225,14 +207,14 @@ DO NOT MODIFY - GENERATED CODE
               </execution>
             </executions>
             <configuration>
-              <doclint>none</doclint>
+              <additionalJOption>-Xdoclint:none</additionalJOption>
+              <additionalOptions>-html5</additionalOptions>
+              <quiet>true</quiet>
+              <detectJavaApiLink>false</detectJavaApiLink>
             </configuration>
           </plugin>
         </plugins>
       </build>
-      <properties>
-        <invoker.skip>true</invoker.skip>
-      </properties>
     </profile>
   </profiles>
 </project>
