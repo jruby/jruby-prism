@@ -2732,8 +2732,13 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Signature calculateSignatureFor(Node node) {
-        // FIXME: #1383 will change all this for masn case so impl once done
-        return Signature.ONE_REQUIRED;
+        if (node instanceof MultiTargetNode) {
+            MultiTargetNode multi = (MultiTargetNode) node;
+            Signature.Rest rest = multi.rest != null ? Signature.Rest.NORM : Signature.Rest.NONE;
+            return Signature.from(multi.lefts.length, 0, multi.rights.length, 0, 0, rest, -1);
+        } else {
+            return Signature.from(1, 0, 0, 0, 0, Signature.Rest.NONE, -1);
+        }
     }
 
     public StaticScope createStaticScopeFrom(RubySymbol[] tokens, StaticScope.Type type) {
