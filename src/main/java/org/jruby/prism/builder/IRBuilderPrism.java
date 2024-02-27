@@ -2814,7 +2814,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         // FIXME: This should be done by prism.
         if (RubyString.scanForCodeRange(bytelist) == StringSupport.CR_BROKEN) {
             Ruby runtime = getManager().getRuntime();
-            throw runtime.newEncodingError(str(runtime, "invalid symbol in encoding " + getEncoding() + " :\"", inspectIdentifierByteList(runtime, bytelist), "\""));
+            throw runtime.newSyntaxError(str(runtime, "invalid symbol in encoding " + getEncoding() + " :\"", inspectIdentifierByteList(runtime, bytelist), "\""));
         }
 
         return symbol(bytelist);
