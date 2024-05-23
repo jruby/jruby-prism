@@ -4,7 +4,7 @@
   <groupId>org.jruby</groupId>
   <artifactId>jruby-prism</artifactId>
   <packaging>jar</packaging>
-  <version>0.25.0-SNAPSHOT</version>
+  <version>0.29.0-SNAPSHOT</version>
   <name>jruby-prism</name>
   <description>
     Java portion of JRuby Prism parser support.
