@@ -6599,44 +6599,6 @@ public abstract class Nodes {
 
     /**
      * <pre>
-     * Represents reading from the implicit `it` local variable.
-     *
-     *     -&gt; { it }
-     *          ^^
-     * </pre>
-     */
-    public static final class ItLocalVariableReadNode extends Node {
-
-        public ItLocalVariableReadNode(int startOffset, int length) {
-            super(startOffset, length);
-        }
-                
-        public <T> void visitChildNodes(AbstractNodeVisitor<T> visitor) {
-        }
-
-        public Node[] childNodes() {
-            return EMPTY_ARRAY;
-        }
-
-        public <T> T accept(AbstractNodeVisitor<T> visitor) {
-            return visitor.visitItLocalVariableReadNode(this);
-        }
-
-        @Override
-        protected String toString(String indent) {
-            StringBuilder builder = new StringBuilder();
-            builder.append(this.getClass().getSimpleName());
-            if (hasNewLineFlag()) {
-                builder.append("[Li]");
-            }
-            builder.append('\n');
-            String nextIndent = indent + "  ";
-            return builder.toString();
-        }
-    }
-
-    /**
-     * <pre>
      * Represents an implicit set of parameters through the use of the `it` keyword within a block or lambda.
      *
      *     -&gt; { it + it }
@@ -7051,6 +7013,10 @@ public abstract class Nodes {
          * Note that this can also be an underscore followed by a number for the default block parameters.
          *
          *     _1     # name `:_1`
+         *
+         * Finally, for the default `it` block parameter, the name is `0it`. This is to distinguish it from an `it` local variable that is explicitly declared.
+         *
+         *     it     # name `:0it`
          * </pre>
          */
         public final org.jruby.RubySymbol name;
@@ -8687,52 +8653,19 @@ public abstract class Nodes {
      * </pre>
      */
     public static final class RationalNode extends Node {
-        public final short flags;
-        /**
-         * <pre>
-         * The numerator of the rational number.
-         *
-         *     1.5r # numerator 3
-         * </pre>
-         */
-        public final Object numerator;
-        /**
-         * <pre>
-         * The denominator of the rational number.
-         *
-         *     1.5r # denominator 2
-         * </pre>
-         */
-        public final Object denominator;
+        public final Node numeric;
 
-        public RationalNode(short flags, Object numerator, Object denominator, int startOffset, int length) {
+        public RationalNode(Node numeric, int startOffset, int length) {
             super(startOffset, length);
-            this.flags = flags;
-            this.numerator = numerator;
-            this.denominator = denominator;
+            this.numeric = numeric;
         }
-        
-        public boolean isBinary() {
-            return IntegerBaseFlags.isBinary(this.flags);
-        }
-
-        public boolean isDecimal() {
-            return IntegerBaseFlags.isDecimal(this.flags);
-        }
-
-        public boolean isOctal() {
-            return IntegerBaseFlags.isOctal(this.flags);
-        }
-
-        public boolean isHexadecimal() {
-            return IntegerBaseFlags.isHexadecimal(this.flags);
-        }
-        
+                
         public <T> void visitChildNodes(AbstractNodeVisitor<T> visitor) {
+            this.numeric.accept(visitor);
         }
 
         public Node[] childNodes() {
-            return EMPTY_ARRAY;
+            return new Node[] { this.numeric };
         }
 
         public <T> T accept(AbstractNodeVisitor<T> visitor) {
@@ -8749,17 +8682,8 @@ public abstract class Nodes {
             builder.append('\n');
             String nextIndent = indent + "  ";
             builder.append(nextIndent);
-            builder.append("flags: ");
-            builder.append(this.flags);
-            builder.append('\n');
-            builder.append(nextIndent);
-            builder.append("numerator: ");
-            builder.append(this.numerator);
-            builder.append('\n');
-            builder.append(nextIndent);
-            builder.append("denominator: ");
-            builder.append(this.denominator);
-            builder.append('\n');
+            builder.append("numeric: ");
+            builder.append(this.numeric.toString(nextIndent));
             return builder.toString();
         }
     }
@@ -10526,7 +10450,6 @@ public abstract class Nodes {
         EXPRESSION_NOT_WRITABLE_FILE,
         EXPRESSION_NOT_WRITABLE_LINE,
         EXPRESSION_NOT_WRITABLE_NIL,
-        EXPRESSION_NOT_WRITABLE_NUMBERED,
         EXPRESSION_NOT_WRITABLE_SELF,
         EXPRESSION_NOT_WRITABLE_TRUE,
         FLOAT_PARSE,
@@ -10566,7 +10489,6 @@ public abstract class Nodes {
         INVALID_NUMBER_UNDERSCORE_INNER,
         INVALID_NUMBER_UNDERSCORE_TRAILING,
         INVALID_PERCENT,
-        INVALID_PERCENT_EOF,
         INVALID_PRINTABLE_CHARACTER,
         INVALID_RETRY_AFTER_ELSE,
         INVALID_RETRY_AFTER_ENSURE,
@@ -10598,10 +10520,9 @@ public abstract class Nodes {
         NO_LOCAL_VARIABLE,
         NOT_EXPRESSION,
         NUMBER_LITERAL_UNDERSCORE,
-        NUMBERED_PARAMETER_INNER_BLOCK,
         NUMBERED_PARAMETER_IT,
         NUMBERED_PARAMETER_ORDINARY,
-        NUMBERED_PARAMETER_OUTER_BLOCK,
+        NUMBERED_PARAMETER_OUTER_SCOPE,
         OPERATOR_MULTI_ASSIGN,
         OPERATOR_WRITE_ARGUMENTS,
         OPERATOR_WRITE_BLOCK,
@@ -10692,7 +10613,6 @@ public abstract class Nodes {
     public static ErrorType[] ERROR_TYPES = ErrorType.values();
 
     public enum WarningType {
-        AMBIGUOUS_BINARY_OPERATOR,
         AMBIGUOUS_FIRST_ARGUMENT_MINUS,
         AMBIGUOUS_FIRST_ARGUMENT_PLUS,
         AMBIGUOUS_PREFIX_AMPERSAND,

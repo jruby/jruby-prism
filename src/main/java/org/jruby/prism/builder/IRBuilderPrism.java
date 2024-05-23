@@ -41,6 +41,7 @@ import org.jruby.ir.operands.LocalVariable;
 import org.jruby.ir.operands.MutableString;
 import org.jruby.ir.operands.NullBlock;
 import org.jruby.ir.operands.Operand;
+import org.jruby.ir.operands.Rational;
 import org.jruby.ir.operands.Regexp;
 import org.jruby.ir.operands.Splat;
 import org.jruby.ir.operands.Symbol;
@@ -65,6 +66,7 @@ import org.prism.Nodes;
 import org.prism.Nodes.*;
 import org.jruby.prism.parser.ParseResultPrism;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -1803,7 +1805,19 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildRational(RationalNode node) {
-        return buildRational((Node) node.numerator, (Node) node.denominator);
+        if (node.numeric instanceof FloatNode) {
+            BigDecimal bd = new BigDecimal(bytelistFrom(node.numeric).toString());
+            BigDecimal denominator = BigDecimal.ONE.scaleByPowerOfTen(bd.scale());
+            BigDecimal numerator = bd.multiply(denominator);
+
+            try {
+                return new Rational(fix(numerator.longValueExact()), fix(denominator.longValueExact()));
+            } catch (ArithmeticException ae) {
+                return new Rational(new Bignum(numerator.toBigIntegerExact()), new Bignum(denominator.toBigIntegerExact()));
+            }
+        }
+
+        return new Rational((ImmutableLiteral) build(node.numeric), fix(1));
     }
 
     private Operand buildRange(RangeNode node) {
