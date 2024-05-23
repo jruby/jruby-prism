@@ -1809,15 +1809,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         return buildPostExe(node.statements, getLine(node));
     }
 
-    private Operand buildPreExecution(PreExecutionNode node) {
-        return buildPreExe(node.statements);
-    }
-
-    private Operand buildRange(RangeNode node) {
-        return buildRange(node.left, node.right, node.isExcludeEnd());
-    }
-
-    private Operand buildRational(RationalNode node) {
+    private Operand buildPreExecution(PreExecutionNode node) {    private Operand buildRational(RationalNode node) {
         if (node.numeric instanceof FloatNode) {
             BigDecimal bd = new BigDecimal(bytelistFrom(node.numeric).toString());
             BigDecimal denominator = BigDecimal.ONE.scaleByPowerOfTen(bd.scale());
@@ -1829,9 +1821,17 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                 return new Rational(new Bignum(numerator.toBigIntegerExact()), new Bignum(denominator.toBigIntegerExact()));
             }
         }
-        // FIXME: Meh. will this always work.
+
         return new Rational((ImmutableLiteral) build(node.numeric), fix(1));
     }
+        return buildPreExe(node.statements);
+    }
+
+    private Operand buildRange(RangeNode node) {
+        return buildRange(node.left, node.right, node.isExcludeEnd());
+    }
+
+
 
     private Operand buildRedo(RedoNode node) {
         return buildRedo(getLine(node));
@@ -2515,8 +2515,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         return keys;
     }
 
-    Operand buildPatternLocal(LocalVariableTargetNode node, Operand value, boolean inAlternation) {
-        return buildPatternLocal(value, node.name, getLine(node), node.depth, inAlternation);
+    void buildPatternLocal(LocalVariableTargetNode node, Operand value, boolean inAlternation) {
+        buildPatternLocal(value, node.name, getLine(node), node.depth, inAlternation);
     }
 
     @Override
