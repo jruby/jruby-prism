@@ -13,6 +13,7 @@ import org.jruby.parser.Parser;
 import org.jruby.parser.ParserManager;
 import org.jruby.parser.ParserType;
 import org.jruby.parser.StaticScope;
+import org.jruby.runtime.Constants;
 import org.jruby.runtime.DynamicScope;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
@@ -228,7 +229,11 @@ public class ParserPrism extends Parser {
         metadata.append(runtime.getInstanceConfig().isFrozenStringLiteral() ? 1 : 0);
 
         // version
-        metadata.append(ParsingOptions.SyntaxVersion.V3_3_0.getValue());
+        if (Constants.RUBY_MAJOR_VERSION.equals("3.3")) {
+            metadata.append(ParsingOptions.SyntaxVersion.V3_3.getValue());
+        } else {
+            metadata.append(ParsingOptions.SyntaxVersion.LATEST.getValue());
+        }
 
         // Eval scopes (or none for normal parses)
         if (type == EVAL) {

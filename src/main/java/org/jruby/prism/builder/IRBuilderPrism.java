@@ -41,7 +41,6 @@ import org.jruby.ir.operands.LocalVariable;
 import org.jruby.ir.operands.MutableString;
 import org.jruby.ir.operands.NullBlock;
 import org.jruby.ir.operands.Operand;
-import org.jruby.ir.operands.Rational;
 import org.jruby.ir.operands.Regexp;
 import org.jruby.ir.operands.Splat;
 import org.jruby.ir.operands.Symbol;
@@ -66,7 +65,6 @@ import org.prism.Nodes;
 import org.prism.Nodes.*;
 import org.jruby.prism.parser.ParseResultPrism;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -390,7 +388,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildCallOperatorWrite(CallOperatorWriteNode node) {
-        return buildOpAsgn(node.receiver, node.value, node.read_name, node.write_name, node.operator, node.isSafeNavigation());
+        return buildOpAsgn(node.receiver, node.value, node.read_name, node.write_name, node.binary_operator, node.isSafeNavigation());
     }
 
     private Operand buildImaginary(ImaginaryNode node) {
@@ -507,16 +505,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             addInstr(new PutClassVariableInstr(classVarDefinitionContainer(), ((ClassVariableTargetNode) node).name, rhsVal));
         } else if (node instanceof ConstantPathTargetNode) {
             Operand parent = buildModuleParent(((ConstantPathTargetNode) node).parent);
-            Node child = ((ConstantPathTargetNode) node).child;
-            RubySymbol name;
-            if (child instanceof ConstantTargetNode) {
-                name = ((ConstantTargetNode) child).name;
-            } else if (child instanceof ConstantReadNode) {
-                name = ((ConstantReadNode) child).name;
-            } else {
-                throwSyntaxError(getLine(child), "Unknown child in ConstantPathTargetNode");
-                name = null;
-            }
+            RubySymbol name = ((ConstantPathTargetNode) node).name;
             addInstr(new PutConstInstr(parent, name, rhsVal));
         } else if (node instanceof ConstantTargetNode) {
             addInstr(new PutConstInstr(getCurrentModuleVariable(), ((ConstantTargetNode) node).name, rhsVal));
@@ -844,7 +833,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     private Operand buildClassVariableOperatorWrite(ClassVariableOperatorWriteNode node) {
         Operand lhs = buildClassVar(temp(), node.name);
         Operand rhs = build(node.value);
-        Variable value = call(temp(), lhs, node.operator, rhs);
+        Variable value = call(temp(), lhs, node.binary_operator, rhs);
         addInstr(new PutClassVariableInstr(classVarDefinitionContainer(), node.name, value));
         return value;
     }
@@ -852,7 +841,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     private Operand buildInstanceVariableOperatorWrite(InstanceVariableOperatorWriteNode node) {
         Operand lhs = buildInstVar(node.name);
         Operand rhs = build(node.value);
-        Variable value = call(temp(), lhs, node.operator, rhs);
+        Variable value = call(temp(), lhs, node.binary_operator, rhs);
         addInstr(new PutFieldInstr(buildSelf(), node.name, value));
         return value;
     }
@@ -861,7 +850,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         int depth = staticScope.isDefined(node.name.idString()) >> 16;
         Variable lhs = getLocalVariable(node.name, depth);
         Operand rhs = build(node.value);
-        Variable value = call(lhs, lhs, node.operator, rhs);
+        Variable value = call(lhs, lhs, node.binary_operator, rhs);
         return value;
     }
 
@@ -910,7 +899,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     private Operand buildConstantOperatorWrite(ConstantOperatorWriteNode node) {
         Operand lhs = searchConst(temp(), node.name);
         Operand rhs = build(node.value);
-        Variable value = call(temp(), lhs, node.operator, rhs);
+        Variable value = call(temp(), lhs, node.binary_operator, rhs);
         putConstant(buildSelf(), node.name, value);
         return value;
     }
@@ -923,7 +912,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
     private Operand buildConstantOrWritePath(ConstantPathOrWriteNode node) {
         // FIXME: unify with AST
-        RubySymbol name = ((ConstantReadNode) node.target.child).name;
+        RubySymbol name = ((ConstantPathNode) node.target).name;
         Variable result = temp();
         Label falseCheck = getNewLabel();
         Label done = getNewLabel();
@@ -944,7 +933,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildConstantPath(Variable result, ConstantPathNode node) {
-        return buildConstantPath(result, ((ConstantReadNode) node.child).name, node.parent);
+        return buildConstantPath(result, node.name, node.parent);
     }
 
     private Operand buildConstantPath(Variable result, RubySymbol name, Node parent) {
@@ -957,7 +946,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildConstantPathOperatorWrite(ConstantPathOperatorWriteNode node) {
-        return buildOpAsgnConstDecl(node.target, node.value, node.operator);
+        return buildOpAsgnConstDecl(node.target, node.value, node.binary_operator);
     }
 
     private Operand buildConstantPathOrWrite(ConstantPathOrWriteNode node) {
@@ -978,7 +967,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
     // Multiple assignments provide the value otherwise it is grabbed from .value on the node.
     private Operand buildConstantWritePath(ConstantPathNode path, Operand value) {
-        return putConstant(buildModuleParent(path.parent), ((ConstantReadNode) path.child).name, value);
+        return putConstant(buildModuleParent(path.parent), path.name, value);
     }
 
     private Operand buildDef(DefNode node) {
@@ -1242,7 +1231,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
             ConstantPathNode path = (ConstantPathNode) node;
 
-            final RubySymbol name = ((ConstantReadNode) path.child).name;
+            final RubySymbol name = path.name;
             final Variable errInfo = temp();
 
             // store previous exception for restoration if we rescue something
@@ -1326,7 +1315,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     private Operand buildGlobalVariableOperatorWrite(GlobalVariableOperatorWriteNode node) {
         Operand lhs = buildGlobalVar(temp(), node.name);
         Operand rhs = build(node.value);
-        Variable value = call(temp(), lhs, node.operator, rhs);
+        Variable value = call(temp(), lhs, node.binary_operator, rhs);
         addInstr(new PutGlobalVarInstr(node.name, value));
         return value;
     }
@@ -1414,7 +1403,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildIndexOperatorWrite(IndexOperatorWriteNode node) {
-        return buildOpElementAsgnWithMethod(node.receiver, node.arguments, node.block, node.value, node.operator);
+        return buildOpElementAsgnWithMethod(node.receiver, node.arguments, node.block, node.value, node.binary_operator);
     }
 
     private Operand buildIndexOrWrite(IndexOrWriteNode node) {
@@ -1814,19 +1803,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildRational(RationalNode node) {
-        if (node.numeric instanceof FloatNode) {
-            BigDecimal bd = new BigDecimal(bytelistFrom(node.numeric).toString());
-            BigDecimal denominator = BigDecimal.ONE.scaleByPowerOfTen(bd.scale());
-            BigDecimal numerator = bd.multiply(denominator);
-
-            try {
-                return new Rational(fix(numerator.longValueExact()), fix(denominator.longValueExact()));
-            } catch (ArithmeticException ae) {
-                return new Rational(new Bignum(numerator.toBigIntegerExact()), new Bignum(denominator.toBigIntegerExact()));
-            }
-        }
-
-        return new Rational((ImmutableLiteral) build(node.numeric), fix(1));
+        return buildRational((Node) node.numerator, (Node) node.denominator);
     }
 
     private Operand buildRange(RangeNode node) {
@@ -2429,8 +2406,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         } else if (exprNodes instanceof HashPatternNode) {
             HashPatternNode node = (HashPatternNode) exprNodes;
             Node[] keys = getKeys(node);
-            Node rest = node.rest != null ? node.rest : getRestFromKeys(node);
-            buildHashPattern(testEnd, result, deconstructed, node.constant, node, keys, rest, value, inAlternation, isSinglePattern, errorString);
+            buildHashPattern(testEnd, result, deconstructed, node.constant, node, keys, node.rest, value, inAlternation, isSinglePattern, errorString);
         } else if (exprNodes instanceof FindPatternNode) {
             getManager().getRuntime().getWarnings().warnExperimental(getFileName(), getLine(exprNodes) + 1,
                     "Find pattern is experimental, and the behavior may change in future versions of Ruby!");
@@ -2480,17 +2456,6 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                         RegularExpressionFlags.isEucJp(flags) ? EUCJPEncoding.INSTANCE :
                                 RegularExpressionFlags.isWindows31j(flags) ? Windows_31JEncoding.INSTANCE :
                                         null;
-    }
-
-    private Node getRestFromKeys(HashPatternNode node) {
-        int length = node.elements.length;
-
-        // FIXME: can there be multiple assocsplat and why isn't this rest in HashPatternNode
-        for (int i = 0; i < length; i++) {
-            if (node.elements[i] instanceof AssocSplatNode) return node.elements[i];
-        }
-
-        return null;
     }
 
     private Node[] getKeys(HashPatternNode node) {
@@ -2762,7 +2727,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         if (node instanceof ConstantReadNode) {
             return ((ConstantReadNode) node).name.getBytes();
         } else if (node instanceof ConstantPathNode) {
-            return determineBaseName(((ConstantPathNode) node).child);
+            return ((ConstantPathNode) node).name.getBytes();
         }
         throw notCompilable("Unsupported node in module path", node);
     }
@@ -2802,7 +2767,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
     @Override
     protected Operand putConstant(ConstantPathNode path, Operand value) {
-        return putConstant(buildModuleParent(path.parent), ((ConstantReadNode) path.child).name, value);
+        return putConstant(buildModuleParent(path.parent), path.name, value);
     }
 
     protected RubySymbol symbol(SymbolNode node) {
