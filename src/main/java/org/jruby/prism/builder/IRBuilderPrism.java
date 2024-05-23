@@ -1809,7 +1809,11 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         return buildPostExe(node.statements, getLine(node));
     }
 
-    private Operand buildPreExecution(PreExecutionNode node) {    private Operand buildRational(RationalNode node) {
+    private Operand buildPreExecution(PreExecutionNode node) {
+        return buildPreExe(node.statements);
+    }
+
+    private Operand buildRational(RationalNode node) {
         if (node.numeric instanceof FloatNode) {
             BigDecimal bd = new BigDecimal(bytelistFrom(node.numeric).toString());
             BigDecimal denominator = BigDecimal.ONE.scaleByPowerOfTen(bd.scale());
@@ -1823,8 +1827,6 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         }
 
         return new Rational((ImmutableLiteral) build(node.numeric), fix(1));
-    }
-        return buildPreExe(node.statements);
     }
 
     private Operand buildRange(RangeNode node) {
