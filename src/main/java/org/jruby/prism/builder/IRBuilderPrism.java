@@ -66,10 +66,11 @@ import org.prism.Nodes;
 import org.prism.Nodes.*;
 import org.jruby.prism.parser.ParseResultPrism;
 
-import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.jruby.ir.instructions.RuntimeHelperCall.Methods.*;
@@ -351,6 +352,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             return buildReturn((ReturnNode) node);
         } else if (node instanceof SelfNode) {
             return buildSelf();
+        } else if (node instanceof ShareableConstantNode) {
+            return buildShareableConstant((ShareableConstantNode) node);
         } else if (node instanceof SingletonClassNode) {
             return buildSingletonClass((SingletonClassNode) node);
         } else if (node instanceof SourceEncodingNode) {
@@ -568,7 +571,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             RescueNode rescue = node.rescue_clause;
             Node ensureBody = node.ensure_clause != null ? node.ensure_clause.statements : null;
             return buildEnsureInternal(node.statements, node.else_clause, rescue.exceptions, rescue.statements,
-                    rescue.consequent, false, ensureBody, true, rescue.reference);
+                    rescue.subsequent, false, ensureBody, true, rescue.reference);
         } else if (node.ensure_clause != null) {
             EnsureNode ensure = node.ensure_clause;
             return buildEnsureInternal(node.statements, null, null, null, null, false, ensure.statements, false, null);
@@ -820,11 +823,11 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildCase(CaseNode node) {
-        return buildCase(node.predicate, node.conditions, node.consequent);
+        return buildCase(node.predicate, node.conditions, node.else_clause);
     }
 
     private Operand buildCaseMatch(CaseMatchNode node) {
-        return buildPatternCase(node.predicate, node.conditions, node.consequent);
+        return buildPatternCase(node.predicate, node.conditions, node.else_clause);
     }
 
     private Operand buildClass(ClassNode node) {
@@ -1397,7 +1400,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildIf(Variable result, IfNode node) {
-        return buildConditional(result, node.predicate, node.statements, node.consequent);
+        return buildConditional(result, node.predicate, node.statements, node.subsequent);
     }
 
     private Operand buildIndexAndWrite(IndexAndWriteNode node) {
@@ -1467,7 +1470,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             // value of the regexp.  Adding an empty string will pick up the encoding from options (this
             // empty string is how legacy parsers do this but it naturally falls out of the parser.
             pieces = new Node[children.length + 1];
-            pieces[0] = new StringNode((short) 0, EMPTY.bytes(), 0, 0);
+            pieces[0] = new StringNode(0, 0, (short) 0, EMPTY.bytes());
             pieces[1] = children[0];
         } else {
             pieces = children;
@@ -1600,7 +1603,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildMatchRequired(MatchRequiredNode node) {
-        return buildPatternCase(node.value, new Node[] { new InNode(node.pattern, null, 0, 0) }, null);
+        return buildPatternCase(node.value, new Node[] { new InNode(0, 0, node.pattern, null) }, null);
     }
 
     private Operand buildMatchWrite(Variable result, MatchWriteNode node) {
@@ -1805,19 +1808,15 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildRational(RationalNode node) {
-        if (node.numeric instanceof FloatNode) {
-            BigDecimal bd = new BigDecimal(bytelistFrom(node.numeric).toString());
-            BigDecimal denominator = BigDecimal.ONE.scaleByPowerOfTen(bd.scale());
-            BigDecimal numerator = bd.multiply(denominator);
+        ImmutableLiteral num = asRationalValue(node.numerator);
+        ImmutableLiteral den = asRationalValue(node.denominator);
+        return new Rational(num, den);
+    }
 
-            try {
-                return new Rational(fix(numerator.longValueExact()), fix(denominator.longValueExact()));
-            } catch (ArithmeticException ae) {
-                return new Rational(new Bignum(numerator.toBigIntegerExact()), new Bignum(denominator.toBigIntegerExact()));
-            }
-        }
-
-        return new Rational((ImmutableLiteral) build(node.numeric), fix(1));
+    private ImmutableLiteral asRationalValue(Object value) {
+        return value instanceof Integer ? new Fixnum((int) value) :
+                value instanceof Long ? new Fixnum((long) value) :
+                        new Bignum((BigInteger) value);
     }
 
     private Operand buildRange(RangeNode node) {
@@ -1891,6 +1890,11 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         return splatValue;
     }
 
+    private Operand buildShareableConstant(ShareableConstantNode node) {
+        // FIXME: We do not implement shareable constants yet
+        return build(node.write);
+    }
+
     private Operand buildSingletonClass(SingletonClassNode node) {
         return buildSClass(node.expression, node.body,
                 createStaticScopeFrom(node.locals, StaticScope.Type.LOCAL), getLine(node), getEndLine(node));
@@ -1945,7 +1949,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildUnless(Variable result, UnlessNode node) {
-        return buildConditional(result, node.predicate, node.consequent, node.statements);
+        return buildConditional(result, node.predicate, node.else_clause, node.statements);
     }
 
     private Operand buildUntil(UntilNode node) {
@@ -1953,14 +1957,14 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private void buildWhenSplatValues(Variable eqqResult, Node node, Operand testValue, Label bodyLabel,
-                                      Set<IRubyObject> seenLiterals) {
+                                      Set<IRubyObject> seenLiterals, Map<IRubyObject, java.lang.Integer> origLocs) {
         // FIXME: could see errors since this is missing whatever is YARP args{cat,push}?
         if (node instanceof StatementsNode) {
-            buildWhenValues(eqqResult, ((StatementsNode) node).body, testValue, bodyLabel, seenLiterals);
+            buildWhenValues(eqqResult, ((StatementsNode) node).body, testValue, bodyLabel, seenLiterals, origLocs);
         } else if (node instanceof SplatNode) {
-            buildWhenValue(eqqResult, testValue, bodyLabel, node, seenLiterals, true);
+            buildWhenValue(eqqResult, testValue, bodyLabel, node, seenLiterals, origLocs, true);
         } else {
-            buildWhenValue(eqqResult, testValue, bodyLabel, node, seenLiterals, true);
+            buildWhenValue(eqqResult, testValue, bodyLabel, node, seenLiterals, origLocs, true);
         }
     }
 
@@ -1992,7 +1996,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
     @Override
     protected RescueNode optRescueFor(RescueNode node) {
-        return node.consequent;
+        return node.subsequent;
     }
 
     // FIXME: Implement
@@ -2228,19 +2232,20 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     @Override
-    protected void buildWhenArgs(WhenNode whenNode, Operand testValue, Label bodyLabel, Set<IRubyObject> seenLiterals) {
+    protected void buildWhenArgs(WhenNode whenNode, Operand testValue, Label bodyLabel,
+                                 Set<IRubyObject> seenLiterals, Map<IRubyObject, Integer> origLocs) {
         Variable eqqResult = temp();
         Node[] exprNodes = whenNode.conditions;
 
         if (exprNodes.length == 1) {
             if (exprNodes[0] instanceof SplatNode) {
-                buildWhenSplatValues(eqqResult, exprNodes[0], testValue, bodyLabel, seenLiterals);
+                buildWhenSplatValues(eqqResult, exprNodes[0], testValue, bodyLabel, seenLiterals, origLocs);
             } else {
-                buildWhenValue(eqqResult, testValue, bodyLabel, exprNodes[0], seenLiterals, false);
+                buildWhenValue(eqqResult, testValue, bodyLabel, exprNodes[0], seenLiterals, origLocs, false);
             }
         } else {
             for (Node value: exprNodes) {
-                buildWhenValue(eqqResult, testValue, bodyLabel, value, seenLiterals, value instanceof SplatNode);
+                buildWhenValue(eqqResult, testValue, bodyLabel, value, seenLiterals, origLocs, value instanceof SplatNode);
             }
         }
     }
@@ -2428,10 +2433,10 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             buildFindPattern(testEnd, result, deconstructed, node.constant, node.left, node.requireds, node.right, value, inAlternation, isSinglePattern, errorString);
         } else if (exprNodes instanceof IfNode) {
             IfNode node = (IfNode) exprNodes;
-            buildPatternEachIf(result, original, deconstructed, value, node.predicate, node.statements, node.consequent, inAlternation, isSinglePattern, errorString);
+            buildPatternEachIf(result, original, deconstructed, value, node.predicate, node.statements, node.subsequent, inAlternation, isSinglePattern, errorString);
         } else if (exprNodes instanceof UnlessNode) {
             UnlessNode node = (UnlessNode) exprNodes;
-            buildPatternEachIf(result, original, deconstructed, value, node.predicate, node.consequent, node.statements, inAlternation, isSinglePattern, errorString);
+            buildPatternEachIf(result, original, deconstructed, value, node.predicate, node.else_clause, node.statements, inAlternation, isSinglePattern, errorString);
         } else if (exprNodes instanceof LocalVariableTargetNode) {
             buildPatternLocal((LocalVariableTargetNode) exprNodes, value, inAlternation);
         } else if (exprNodes instanceof ImplicitNode) {
@@ -2452,7 +2457,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             Operand expression = build(exprNodes);
             boolean needsSplat = exprNodes instanceof AssocSplatNode; // FIXME: just a guess this is all we need for splat?
 
-            addInstr(new EQQInstr(scope, result, expression, value, needsSplat, scope.maybeUsingRefinements()));
+            addInstr(new EQQInstr(scope, result, expression, value, needsSplat, false, scope.maybeUsingRefinements()));
         }
 
         return result;
@@ -2509,7 +2514,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                 // FIXME: only build literals (which are guaranteed to build without raising).
                 Operand key = build(((AssocNode) node).key);
                 call(result, d, "key?", key);
-                cond_ne(testEnd, result, tru());
+                cond_ne_true(testEnd, result);
 
                 String method = hasRest ? "delete" : "[]";
                 Operand value = call(temp(), d, method, key);
@@ -2528,7 +2533,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                     buildPatternEach(testEnd, result, original, copy(nil()), value, ((AssocNode) node).value, inAlteration, isSinglePattern, errorString);
                 }
 
-                cond_ne(testEnd, result, tru());
+                cond_ne_true(testEnd, result);
             }
         }
     }
@@ -2782,6 +2787,11 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     @Override
     protected Operand putConstant(ConstantPathNode path, Operand value) {
         return putConstant(buildModuleParent(path.parent), path.name, value);
+    }
+
+    @Override
+    protected Operand putConstant(ConstantPathNode path, CodeBlock valueBuilder) {
+        return putConstant(buildModuleParent(path.parent), path.name, valueBuilder.run());
     }
 
     protected RubySymbol symbol(SymbolNode node) {

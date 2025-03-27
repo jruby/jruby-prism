@@ -7,6 +7,10 @@ import org.prism.Loader;
 import org.prism.Nodes;
 import org.prism.ParseResult;
 
+/**
+ * Extends Loader to override some things which are not generated directly
+ * for JRuby.
+ */
 public class LoaderPrism extends Loader {
     private Ruby runtime;
 
