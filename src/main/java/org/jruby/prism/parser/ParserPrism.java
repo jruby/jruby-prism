@@ -11,6 +11,7 @@ import org.jruby.RubySymbol;
 import org.jruby.ext.coverage.CoverageData;
 import org.jruby.management.ParserStats;
 import org.jruby.parser.Parser;
+import org.jruby.parser.ParserManager;
 import org.jruby.parser.ParserType;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.DynamicScope;
@@ -23,6 +24,7 @@ import org.jruby.util.io.ChannelHelper;
 import org.prism.Nodes;
 import org.prism.Nodes.*;
 import org.prism.ParsingOptions;
+import org.prism.Prism;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -32,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.jruby.api.Convert.asSymbol;
 import static org.jruby.lexer.LexingCommon.DOLLAR_UNDERSCORE;
 import static org.jruby.parser.ParserType.EVAL;
 import static org.jruby.parser.ParserType.MAIN;
@@ -173,7 +176,7 @@ public class ParserPrism extends Parser {
 
 
     private byte[] parse(byte[] source, int sourceLength, byte[] metadata) {
-//        if (ParserManager.PARSER_WASM) return parseChicory(source, sourceLength, metadata);
+        if (ParserManager.PARSER_WASM) return parseChicory(source, sourceLength, metadata);
 
         long time = 0;
         if (parserTiming) time = System.nanoTime();
@@ -194,21 +197,12 @@ public class ParserPrism extends Parser {
         return src;
     }
 
-    /*
+
     private byte[] parseChicory(byte[] source, int sourceLength, byte[] metadata) {
-        long time = 0;
-        if (parserTiming) time = System.nanoTime();
-
-        byte[] serialized = prismWasmWrapper.parse(source, sourceLength, metadata);
-
-        if (parserTiming) {
-            ParserStats stats = runtime.getParserManager().getParserStats();
-
-            stats.addYARPTimeCParseSerialize(System.nanoTime() - time);
+        try (Prism prism = new Prism()) {
+            return prism.serialize(metadata, source, sourceLength);
         }
-
-        return serialized;
-    }*/
+    }
 
     // lineNumber (0-indexed)
     private byte[] generateMetadata(String fileName, int lineNumber, Encoding encoding, DynamicScope scope, ParserType type) {
@@ -332,42 +326,43 @@ public class ParserPrism extends Parser {
     // show it happening on line 1 (which is what it should do).
     @Override
     public ParseResult addGetsLoop(Ruby runtime, ParseResult result, boolean printing, boolean processLineEndings, boolean split) {
+        var context = runtime.getCurrentContext();
         List<Nodes.Node> newBody = new ArrayList<>();
 
         if (processLineEndings) {
-            newBody.add(new Nodes.GlobalVariableWriteNode(0, 0, runtime.newSymbol(CommonByteLists.DOLLAR_BACKSLASH),
-                    new GlobalVariableReadNode(0, 0, runtime.newSymbol(CommonByteLists.DOLLAR_SLASH))));
+            newBody.add(new Nodes.GlobalVariableWriteNode(-1, 0, 0, asSymbol(context, CommonByteLists.DOLLAR_BACKSLASH),
+                    new GlobalVariableReadNode(-1, 0, 0, asSymbol(context, CommonByteLists.DOLLAR_SLASH))));
         }
 
-        Nodes.GlobalVariableReadNode dollarUnderscore = new GlobalVariableReadNode(0, 0, runtime.newSymbol(DOLLAR_UNDERSCORE));
+        Nodes.GlobalVariableReadNode dollarUnderscore = new GlobalVariableReadNode(-1, 0, 0, asSymbol(context, DOLLAR_UNDERSCORE));
 
         List<Nodes.Node> whileBody = new ArrayList<>();
 
         if (processLineEndings) {
-            whileBody.add(new CallNode(0, 0, (short) 0, dollarUnderscore, runtime.newSymbol("chomp!"), null, null));
+            whileBody.add(new CallNode(-1, 0, 0, (short) 0, dollarUnderscore, asSymbol(context, "chomp!"), null, null));
         }
         if (split) {
-            whileBody.add(new GlobalVariableWriteNode(0, 0, runtime.newSymbol("$F"),
-                    new Nodes.CallNode(0, 0, (short) 0, dollarUnderscore, runtime.newSymbol("split"), null, null)));
+            whileBody.add(new GlobalVariableWriteNode(-1, 0, 0, asSymbol(context, "$F"),
+                    new Nodes.CallNode(-1, 0, 0, (short) 0, dollarUnderscore, asSymbol(context, "split"), null, null)));
         }
 
         StatementsNode stmts = ((ProgramNode) result.getAST()).statements;
         if (stmts != null && stmts.body != null) whileBody.addAll(Arrays.asList(stmts.body));
 
-        ArgumentsNode args = new ArgumentsNode(0, 0, (short) 0, new Node[] { dollarUnderscore });
-        if (printing) whileBody.add(new CallNode(0, 0, (short) 0, null, runtime.newSymbol("print"), args, null));
+        ArgumentsNode args = new ArgumentsNode(-1, 0, 0, (short) 0, new Node[] { dollarUnderscore });
+        if (printing) whileBody.add(new CallNode(-1, 0, 0, (short) 0, null, asSymbol(context, "print"), args, null));
 
         Node[] nodes = new Node[whileBody.size()];
         whileBody.toArray(nodes);
-        StatementsNode statements = new StatementsNode(0, 0, nodes);
+        StatementsNode statements = new StatementsNode(-1, 0, 0, nodes);
 
-        newBody.add(new WhileNode(0, 0, (short) 0,
-                new CallNode(0, 0, CallNodeFlags.VARIABLE_CALL, null, runtime.newSymbol("gets"), null, null),
+        newBody.add(new WhileNode(-1, 0, 0, (short) 0,
+                new CallNode(-1, 0, 0, CallNodeFlags.VARIABLE_CALL, null, asSymbol(context, "gets"), null, null),
                 statements));
 
         nodes = new Node[newBody.size()];
         newBody.toArray(nodes);
-        Nodes.ProgramNode newRoot = new Nodes.ProgramNode(0, 0, new RubySymbol[] {}, new StatementsNode(0, 0, nodes));
+        Nodes.ProgramNode newRoot = new Nodes.ProgramNode(-1, 0, 0, new RubySymbol[] {}, new StatementsNode(-1, 0, 0, nodes));
 
         ((ParseResultPrism) result).setRoot(newRoot);
 

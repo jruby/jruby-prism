@@ -4,7 +4,7 @@
   <groupId>org.jruby</groupId>
   <artifactId>jruby-prism</artifactId>
   <packaging>jar</packaging>
-  <version>1.4.0</version>
+  <version>1.5.0</version>
   <name>jruby-prism</name>
   <description>
     Java portion of JRuby Prism parser support.
@@ -12,8 +12,10 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven.compiler.source>21</maven.compiler.source>
-    <maven.compiler.target>21</maven.compiler.target>    
+    <chicory.version>1.2.1</chicory.version>
+    <junit.version>5.12.1</junit.version>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>    
   </properties>
 
   <parent>
@@ -48,6 +50,18 @@
     </developer>
   </developers>
 
+  <dependencyManagement>
+    <dependencies>
+          <dependency>
+              <groupId>com.dylibso.chicory</groupId>
+              <artifactId>bom</artifactId>
+              <version>${chicory.version}</version>
+              <type>pom</type>
+              <scope>import</scope>
+          </dependency>
+      </dependencies>
+  </dependencyManagement>
+
   <dependencies>
     <dependency>
        <groupId>org.jruby</groupId>
@@ -55,10 +69,9 @@
        <version>10.0.0.0-SNAPSHOT</version>
     </dependency>
     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>4.13.1</version>
-      <scope>test</scope>
+      <groupId>com.prism</groupId>
+      <artifactId>java-prism</artifactId>
+      <version>999-SNAPSHOT</version>
     </dependency>
   </dependencies>
 
