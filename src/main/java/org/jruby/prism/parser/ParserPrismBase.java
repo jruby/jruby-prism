@@ -11,7 +11,6 @@ import org.jruby.RubySymbol;
 import org.jruby.ext.coverage.CoverageData;
 import org.jruby.management.ParserStats;
 import org.jruby.parser.Parser;
-import org.jruby.parser.ParserManager;
 import org.jruby.parser.ParserType;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.DynamicScope;
@@ -21,10 +20,16 @@ import org.jruby.runtime.load.LoadServiceResourceInputStream;
 import org.jruby.util.ByteList;
 import org.jruby.util.CommonByteLists;
 import org.jruby.util.io.ChannelHelper;
-import org.prism.Nodes;
-import org.prism.Nodes.*;
+import org.prism.Nodes.ArgumentsNode;
+import org.prism.Nodes.CallNode;
+import org.prism.Nodes.CallNodeFlags;
+import org.prism.Nodes.GlobalVariableReadNode;
+import org.prism.Nodes.GlobalVariableWriteNode;
+import org.prism.Nodes.Node;
+import org.prism.Nodes.ProgramNode;
+import org.prism.Nodes.StatementsNode;
+import org.prism.Nodes.WhileNode;
 import org.prism.ParsingOptions;
-import org.prism.Prism;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -39,15 +44,14 @@ import static org.jruby.lexer.LexingCommon.DOLLAR_UNDERSCORE;
 import static org.jruby.parser.ParserType.EVAL;
 import static org.jruby.parser.ParserType.MAIN;
 
-public class ParserPrism extends Parser {
-    private boolean parserTiming = org.jruby.util.cli.Options.PARSER_SUMMARY.load();
+public abstract class ParserPrismBase extends Parser {
+    protected boolean parserTiming = org.jruby.util.cli.Options.PARSER_SUMMARY.load();
 
-    private final ParserBindingPrism prismLibrary;
-
-    public ParserPrism(Ruby runtime, ParserBindingPrism prismLibrary) {
+    public ParserPrismBase(Ruby runtime) {
         super(runtime);
-        this.prismLibrary = prismLibrary;
     }
+
+    protected abstract byte[] parse(byte[] source, int sourceLength, byte[] metadata);
 
     @Override
     public ParseResult parse(String fileName, int lineNumber, ByteList content, DynamicScope existingScope, ParserType type) {
@@ -113,10 +117,10 @@ public class ParserPrism extends Parser {
             coverageMode = runtime.getCoverageData().getMode();
         }
 
-        ParseResultPrism result = new ParseResultPrism(fileName, source, (Nodes.ProgramNode) res.value, res.source, encoding, coverageMode);
+        ParseResultPrism result = new ParseResultPrism(fileName, source, (ProgramNode) res.value, res.source, encoding, coverageMode);
         if (blockScope != null) {
             if (type == MAIN) { // update TOPLEVEL_BINDNG
-                RubySymbol[] locals = ((Nodes.ProgramNode) result.getAST()).locals;
+                RubySymbol[] locals = ((ProgramNode) result.getAST()).locals;
                 for (int i = 0; i < locals.length; i++) {
                     blockScope.getStaticScope().addVariableThisScope(locals[i].idString());
                 }
@@ -171,36 +175,6 @@ public class ParserPrism extends Parser {
             return source;
         } catch (IOException e) {
             throw runtime.newSyntaxError("Failed to read source file: " + fileName);
-        }
-    }
-
-
-    private byte[] parse(byte[] source, int sourceLength, byte[] metadata) {
-        if (ParserManager.PARSER_WASM) return parseChicory(source, sourceLength, metadata);
-
-        long time = 0;
-        if (parserTiming) time = System.nanoTime();
-
-        ParserBindingPrism.Buffer buffer = new ParserBindingPrism.Buffer(jnr.ffi.Runtime.getRuntime(prismLibrary));
-        prismLibrary.pm_buffer_init(buffer);
-        prismLibrary.pm_serialize_parse(buffer, source, sourceLength, metadata);
-        if (parserTiming) {
-            ParserStats stats = runtime.getParserManager().getParserStats();
-
-            stats.addPrismTimeCParseSerialize(System.nanoTime() - time);
-        }
-
-        int length = buffer.length.intValue();
-        byte[] src = new byte[length];
-        buffer.value.get().get(0, src, 0, length);
-
-        return src;
-    }
-
-
-    private byte[] parseChicory(byte[] source, int sourceLength, byte[] metadata) {
-        try (Prism prism = new Prism()) {
-            return prism.serialize(metadata, source, sourceLength);
         }
     }
 
@@ -327,23 +301,23 @@ public class ParserPrism extends Parser {
     @Override
     public ParseResult addGetsLoop(Ruby runtime, ParseResult result, boolean printing, boolean processLineEndings, boolean split) {
         var context = runtime.getCurrentContext();
-        List<Nodes.Node> newBody = new ArrayList<>();
+        List<Node> newBody = new ArrayList<>();
 
         if (processLineEndings) {
-            newBody.add(new Nodes.GlobalVariableWriteNode(-1, 0, 0, asSymbol(context, CommonByteLists.DOLLAR_BACKSLASH),
+            newBody.add(new GlobalVariableWriteNode(-1, 0, 0, asSymbol(context, CommonByteLists.DOLLAR_BACKSLASH),
                     new GlobalVariableReadNode(-1, 0, 0, asSymbol(context, CommonByteLists.DOLLAR_SLASH))));
         }
 
-        Nodes.GlobalVariableReadNode dollarUnderscore = new GlobalVariableReadNode(-1, 0, 0, asSymbol(context, DOLLAR_UNDERSCORE));
+        GlobalVariableReadNode dollarUnderscore = new GlobalVariableReadNode(-1, 0, 0, asSymbol(context, DOLLAR_UNDERSCORE));
 
-        List<Nodes.Node> whileBody = new ArrayList<>();
+        List<Node> whileBody = new ArrayList<>();
 
         if (processLineEndings) {
             whileBody.add(new CallNode(-1, 0, 0, (short) 0, dollarUnderscore, asSymbol(context, "chomp!"), null, null));
         }
         if (split) {
             whileBody.add(new GlobalVariableWriteNode(-1, 0, 0, asSymbol(context, "$F"),
-                    new Nodes.CallNode(-1, 0, 0, (short) 0, dollarUnderscore, asSymbol(context, "split"), null, null)));
+                    new CallNode(-1, 0, 0, (short) 0, dollarUnderscore, asSymbol(context, "split"), null, null)));
         }
 
         StatementsNode stmts = ((ProgramNode) result.getAST()).statements;
@@ -362,7 +336,7 @@ public class ParserPrism extends Parser {
 
         nodes = new Node[newBody.size()];
         newBody.toArray(nodes);
-        Nodes.ProgramNode newRoot = new Nodes.ProgramNode(-1, 0, 0, new RubySymbol[] {}, new StatementsNode(-1, 0, 0, nodes));
+        ProgramNode newRoot = new ProgramNode(-1, 0, 0, new RubySymbol[] {}, new StatementsNode(-1, 0, 0, nodes));
 
         ((ParseResultPrism) result).setRoot(newRoot);
 
