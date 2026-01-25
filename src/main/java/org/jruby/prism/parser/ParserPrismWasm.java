@@ -24,13 +24,13 @@ import static org.jruby.lexer.LexingCommon.DOLLAR_UNDERSCORE;
 import static org.jruby.parser.ParserType.EVAL;
 
 public class ParserPrismWasm extends ParserPrismBase {
+    private static final Prism prism = new Prism();
+
     public ParserPrismWasm(Ruby runtime) {
         super(runtime);
     }
 
     protected byte[] parse(byte[] source, int sourceLength, byte[] metadata) {
-        try (Prism prism = new Prism()) {
-            return prism.serialize(metadata, source, sourceLength);
-        }
+        return prism.serialize(metadata, source, sourceLength);
     }
 }
