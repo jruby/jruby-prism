@@ -250,12 +250,17 @@ public abstract class ParserPrismBase extends Parser {
         buf.append(value >>> 24);
     }
 
-    private byte[] encodeEvalScopes(ByteList buf, StaticScope scope) {
+    private void encodeEvalScopes(ByteList buf, StaticScope scope) {
         int startIndex = buf.realSize();
+
+        // append uint 0 to reserve the space
         appendUnsignedInt(buf, 0);
+
+        // write the scopes to the buffer
         int count = encodeEvalScopesInner(buf, scope, 1);
+
+        // overwrite int 0 with scope count
         writeUnsignedInt(buf, startIndex, count);
-        return buf.bytes();
     }
 
     private int encodeEvalScopesInner(ByteList buf, StaticScope scope, int count) {
@@ -265,8 +270,13 @@ public abstract class ParserPrismBase extends Parser {
 
         // once more for method scope
         String names[] = scope.getVariables();
+
+        // number of variables
         appendUnsignedInt(buf, names.length);
+
+        // forwarding flags
         buf.append(0);
+
         for (String name : names) {
             // Get the bytes "raw" (which we use ISO8859_1 for) as this is how we record these in StaticScope.
             byte[] bytes = name.getBytes(ISO8859_1Encoding.INSTANCE.getCharset());
