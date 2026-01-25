@@ -212,7 +212,7 @@ public abstract class ParserPrismBase extends Parser {
         metadata.append(flags);
 
         // version
-        metadata.append(ParsingOptions.SyntaxVersion.V3_4.getValue());
+        metadata.append(ParsingOptions.SyntaxVersion.V4_0.getValue());
 
         // Do not lock encoding
         metadata.append(0);
