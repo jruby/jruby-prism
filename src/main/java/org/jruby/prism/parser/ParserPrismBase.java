@@ -37,7 +37,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.jruby.api.Convert.asSymbol;
 import static org.jruby.lexer.LexingCommon.DOLLAR_UNDERSCORE;
@@ -57,7 +59,7 @@ public abstract class ParserPrismBase extends Parser {
     public ParseResult parse(String fileName, int lineNumber, ByteList content, DynamicScope existingScope, ParserType type) {
         int sourceLength = content.realSize();
         byte[] source = content.begin() == 0 ? content.unsafeBytes() : content.bytes();
-        byte[] metadata = generateMetadata(fileName, lineNumber, content.getEncoding(), existingScope, type);
+        byte[] metadata = generateMetadata(fileName, lineNumber, content.getEncoding(), existingScope);
         byte[] serialized = parse(source, sourceLength, metadata);
         return parseInternal(fileName, existingScope, source, serialized, type);
     }
@@ -152,7 +154,7 @@ public abstract class ParserPrismBase extends Parser {
     protected ParseResult parse(String fileName, int lineNumber, InputStream in, Encoding encoding,
                       DynamicScope existingScope, ParserType type) {
         byte[] source = getSourceAsBytes(fileName, in);
-        byte[] metadata = generateMetadata(fileName, lineNumber, encoding, existingScope, type);
+        byte[] metadata = generateMetadata(fileName, lineNumber, encoding, existingScope);
         byte[] serialized = parse(source, source.length, metadata);
         return parseInternal(fileName, existingScope, source, serialized, type);
     }
@@ -179,61 +181,57 @@ public abstract class ParserPrismBase extends Parser {
     }
 
     // lineNumber (0-indexed)
-    private byte[] generateMetadata(String fileName, int lineNumber, Encoding encoding, DynamicScope scope, ParserType type) {
-        ByteList metadata = new ByteList();
+    private byte[] generateMetadata(String fileName, int lineNumber, Encoding encoding, DynamicScope scope) {
+        return ParsingOptions.serialize(
+                fileName.getBytes(),
+                lineNumber + 1,
+                encoding.getName(),
+                (runtime.getInstanceConfig().isFrozenStringLiteral() instanceof Boolean bool && bool),
+                commandLineFromConfig(runtime.getInstanceConfig()),
+                ParsingOptions.SyntaxVersion.V4_0,
+                false,
+                true,
+                false,
+                evalScopes(scope));
+    }
 
-        // Filepath
-        byte[] name = fileName.getBytes();
-        appendUnsignedInt(metadata, name.length);
-        metadata.append(name);
+    private ParsingOptions.Scope[] evalScopes(DynamicScope scope) {
+        if (scope == null) return new ParsingOptions.Scope[0];
 
-        // FIXME: I believe line number can be negative?
-        // Line Number (1-indexed)
-        appendUnsignedInt(metadata, lineNumber + 1);
+        var scopes = new ArrayList<ParsingOptions.Scope>();
 
-        // Encoding
-        name = encoding.getName();
-        appendUnsignedInt(metadata, name.length);
-        metadata.append(name);
+        evalScopesRecursive(scope.getStaticScope(), scopes);
 
-        // frozen string literal
-        Boolean frozen = runtime.getInstanceConfig().isFrozenStringLiteral();
-        metadata.append(frozen != null && frozen ? 1 : 0);
+        return scopes.toArray(ParsingOptions.Scope[]::new);
+    }
 
-        // command-line flags
-        RubyInstanceConfig config = runtime.getInstanceConfig();
-        byte flags = 0;
-        if (config.isSplit()) flags |= 1;           // -a
-        if (config.isInlineScript()) flags |= 2;    // -e
-        if (config.isProcessLineEnds()) flags |= 4; // -l
-        //if (config.isAssumeLoop()) flags |= 8;      // -n
-        //if (config.isAssumePrinting()) flags |= 16; // -p
-        if (config.isXFlag()) flags |= 32;          // -x
-        metadata.append(flags);
-
-        // version
-        metadata.append(ParsingOptions.SyntaxVersion.V4_0.getValue());
-
-        // Do not lock encoding
-        metadata.append(0);
-
-        // main script
-        metadata.append(1);
-
-        // partial script
-        metadata.append(0);
-
-        // freeze
-        metadata.append(0);
-
-        // Eval scopes (or none for normal parses)
-        if (type == EVAL) {
-            encodeEvalScopes(metadata, scope.getStaticScope());
-        } else {
-            appendUnsignedInt(metadata, 0);
+    private void evalScopesRecursive(StaticScope scope, ArrayList<ParsingOptions.Scope> scopes) {
+        if (scope.getEnclosingScope() != null && scope.isBlockScope()) {
+            evalScopesRecursive(scope.getEnclosingScope(), scopes);
         }
 
-        return metadata.bytes(); // FIXME: extra arraycopy
+        scopes.add(new ParsingOptions.Scope(
+                Arrays
+                        .stream(scope.getVariables())
+                        .map(String::getBytes)
+                        .toArray(byte[][]::new),
+                IntStream
+                        .range(0, scope.getVariables().length)
+                        .mapToObj((i) -> ParsingOptions.Forwarding.NONE)
+                        .toArray(ParsingOptions.Forwarding[]::new)));
+    }
+
+    private EnumSet<ParsingOptions.CommandLine> commandLineFromConfig(RubyInstanceConfig config) {
+        var list = new ArrayList<ParsingOptions.CommandLine>();
+        
+        if (config.isSplit()) list.add(ParsingOptions.CommandLine.A); // -a
+        if (config.isInlineScript()) list.add(ParsingOptions.CommandLine.E);    // -e
+        if (config.isProcessLineEnds()) list.add(ParsingOptions.CommandLine.L); // -l
+        if (config.isAssumeLoop()) list.add(ParsingOptions.CommandLine.N);      // -n
+        if (config.isAssumePrinting()) list.add(ParsingOptions.CommandLine.P); // -p
+        if (config.isXFlag()) list.add(ParsingOptions.CommandLine.X);          // -x
+
+        return EnumSet.copyOf(list);
     }
 
     private void writeUnsignedInt(ByteList buf, int index, int value) {
