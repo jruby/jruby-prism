@@ -11,7 +11,6 @@ import org.jruby.RubySymbol;
 import org.jruby.ext.coverage.CoverageData;
 import org.jruby.management.ParserStats;
 import org.jruby.parser.Parser;
-import org.jruby.parser.ParserManager;
 import org.jruby.parser.ParserType;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.DynamicScope;
@@ -21,10 +20,16 @@ import org.jruby.runtime.load.LoadServiceResourceInputStream;
 import org.jruby.util.ByteList;
 import org.jruby.util.CommonByteLists;
 import org.jruby.util.io.ChannelHelper;
-import org.prism.Nodes;
-import org.prism.Nodes.*;
+import org.prism.Nodes.ArgumentsNode;
+import org.prism.Nodes.CallNode;
+import org.prism.Nodes.CallNodeFlags;
+import org.prism.Nodes.GlobalVariableReadNode;
+import org.prism.Nodes.GlobalVariableWriteNode;
+import org.prism.Nodes.Node;
+import org.prism.Nodes.ProgramNode;
+import org.prism.Nodes.StatementsNode;
+import org.prism.Nodes.WhileNode;
 import org.prism.ParsingOptions;
-import org.prism.Prism;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -32,28 +37,29 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.jruby.api.Convert.asSymbol;
 import static org.jruby.lexer.LexingCommon.DOLLAR_UNDERSCORE;
 import static org.jruby.parser.ParserType.EVAL;
 import static org.jruby.parser.ParserType.MAIN;
 
-public class ParserPrism extends Parser {
-    private boolean parserTiming = org.jruby.util.cli.Options.PARSER_SUMMARY.load();
+public abstract class ParserPrismBase extends Parser {
+    protected boolean parserTiming = org.jruby.util.cli.Options.PARSER_SUMMARY.load();
 
-    private final ParserBindingPrism prismLibrary;
-
-    public ParserPrism(Ruby runtime, ParserBindingPrism prismLibrary) {
+    public ParserPrismBase(Ruby runtime) {
         super(runtime);
-        this.prismLibrary = prismLibrary;
     }
+
+    protected abstract byte[] parse(byte[] source, int sourceLength, byte[] metadata);
 
     @Override
     public ParseResult parse(String fileName, int lineNumber, ByteList content, DynamicScope existingScope, ParserType type) {
         int sourceLength = content.realSize();
         byte[] source = content.begin() == 0 ? content.unsafeBytes() : content.bytes();
-        byte[] metadata = generateMetadata(fileName, lineNumber, content.getEncoding(), existingScope, type);
+        byte[] metadata = generateMetadata(fileName, lineNumber, content.getEncoding(), existingScope);
         byte[] serialized = parse(source, sourceLength, metadata);
         return parseInternal(fileName, existingScope, source, serialized, type);
     }
@@ -113,10 +119,10 @@ public class ParserPrism extends Parser {
             coverageMode = runtime.getCoverageData().getMode();
         }
 
-        ParseResultPrism result = new ParseResultPrism(fileName, source, (Nodes.ProgramNode) res.value, res.source, encoding, coverageMode);
+        ParseResultPrism result = new ParseResultPrism(fileName, source, (ProgramNode) res.value, res.source, encoding, coverageMode);
         if (blockScope != null) {
             if (type == MAIN) { // update TOPLEVEL_BINDNG
-                RubySymbol[] locals = ((Nodes.ProgramNode) result.getAST()).locals;
+                RubySymbol[] locals = ((ProgramNode) result.getAST()).locals;
                 for (int i = 0; i < locals.length; i++) {
                     blockScope.getStaticScope().addVariableThisScope(locals[i].idString());
                 }
@@ -148,7 +154,7 @@ public class ParserPrism extends Parser {
     protected ParseResult parse(String fileName, int lineNumber, InputStream in, Encoding encoding,
                       DynamicScope existingScope, ParserType type) {
         byte[] source = getSourceAsBytes(fileName, in);
-        byte[] metadata = generateMetadata(fileName, lineNumber, encoding, existingScope, type);
+        byte[] metadata = generateMetadata(fileName, lineNumber, encoding, existingScope);
         byte[] serialized = parse(source, source.length, metadata);
         return parseInternal(fileName, existingScope, source, serialized, type);
     }
@@ -174,92 +180,58 @@ public class ParserPrism extends Parser {
         }
     }
 
-
-    private byte[] parse(byte[] source, int sourceLength, byte[] metadata) {
-        if (ParserManager.PARSER_WASM) return parseChicory(source, sourceLength, metadata);
-
-        long time = 0;
-        if (parserTiming) time = System.nanoTime();
-
-        ParserBindingPrism.Buffer buffer = new ParserBindingPrism.Buffer(jnr.ffi.Runtime.getRuntime(prismLibrary));
-        prismLibrary.pm_buffer_init(buffer);
-        prismLibrary.pm_serialize_parse(buffer, source, sourceLength, metadata);
-        if (parserTiming) {
-            ParserStats stats = runtime.getParserManager().getParserStats();
-
-            stats.addPrismTimeCParseSerialize(System.nanoTime() - time);
-        }
-
-        int length = buffer.length.intValue();
-        byte[] src = new byte[length];
-        buffer.value.get().get(0, src, 0, length);
-
-        return src;
-    }
-
-
-    private byte[] parseChicory(byte[] source, int sourceLength, byte[] metadata) {
-        try (Prism prism = new Prism()) {
-            return prism.serialize(metadata, source, sourceLength);
-        }
-    }
-
     // lineNumber (0-indexed)
-    private byte[] generateMetadata(String fileName, int lineNumber, Encoding encoding, DynamicScope scope, ParserType type) {
-        ByteList metadata = new ByteList();
+    private byte[] generateMetadata(String fileName, int lineNumber, Encoding encoding, DynamicScope scope) {
+        return ParsingOptions.serialize(
+                fileName.getBytes(),
+                lineNumber + 1,
+                encoding.getName(),
+                (runtime.getInstanceConfig().isFrozenStringLiteral() instanceof Boolean bool && bool),
+                commandLineFromConfig(runtime.getInstanceConfig()),
+                ParsingOptions.SyntaxVersion.V4_0,
+                false,
+                true,
+                false,
+                evalScopes(scope));
+    }
 
-        // Filepath
-        byte[] name = fileName.getBytes();
-        appendUnsignedInt(metadata, name.length);
-        metadata.append(name);
+    private ParsingOptions.Scope[] evalScopes(DynamicScope scope) {
+        if (scope == null) return new ParsingOptions.Scope[0];
 
-        // FIXME: I believe line number can be negative?
-        // Line Number (1-indexed)
-        appendUnsignedInt(metadata, lineNumber + 1);
+        var scopes = new ArrayList<ParsingOptions.Scope>();
 
-        // Encoding
-        name = encoding.getName();
-        appendUnsignedInt(metadata, name.length);
-        metadata.append(name);
+        evalScopesRecursive(scope.getStaticScope(), scopes);
 
-        // frozen string literal
-        Boolean frozen = runtime.getInstanceConfig().isFrozenStringLiteral();
-        metadata.append(frozen != null && frozen ? 1 : 0);
+        return scopes.toArray(ParsingOptions.Scope[]::new);
+    }
 
-        // command-line flags
-        RubyInstanceConfig config = runtime.getInstanceConfig();
-        byte flags = 0;
-        if (config.isSplit()) flags |= 1;           // -a
-        if (config.isInlineScript()) flags |= 2;    // -e
-        if (config.isProcessLineEnds()) flags |= 4; // -l
-        //if (config.isAssumeLoop()) flags |= 8;      // -n
-        //if (config.isAssumePrinting()) flags |= 16; // -p
-        if (config.isXFlag()) flags |= 32;          // -x
-        metadata.append(flags);
-
-        // version
-        metadata.append(ParsingOptions.SyntaxVersion.V3_4.getValue());
-
-        // Do not lock encoding
-        metadata.append(0);
-
-        // main script
-        metadata.append(1);
-
-        // partial script
-        metadata.append(0);
-
-        // freeze
-        metadata.append(0);
-
-        // Eval scopes (or none for normal parses)
-        if (type == EVAL) {
-            encodeEvalScopes(metadata, scope.getStaticScope());
-        } else {
-            appendUnsignedInt(metadata, 0);
+    private void evalScopesRecursive(StaticScope scope, ArrayList<ParsingOptions.Scope> scopes) {
+        if (scope.getEnclosingScope() != null && scope.isBlockScope()) {
+            evalScopesRecursive(scope.getEnclosingScope(), scopes);
         }
 
-        return metadata.bytes(); // FIXME: extra arraycopy
+        scopes.add(new ParsingOptions.Scope(
+                Arrays
+                        .stream(scope.getVariables())
+                        .map(String::getBytes)
+                        .toArray(byte[][]::new),
+                IntStream
+                        .range(0, scope.getVariables().length)
+                        .mapToObj((i) -> ParsingOptions.Forwarding.NONE)
+                        .toArray(ParsingOptions.Forwarding[]::new)));
+    }
+
+    private EnumSet<ParsingOptions.CommandLine> commandLineFromConfig(RubyInstanceConfig config) {
+        var list = new ArrayList<ParsingOptions.CommandLine>();
+        
+        if (config.isSplit()) list.add(ParsingOptions.CommandLine.A); // -a
+        if (config.isInlineScript()) list.add(ParsingOptions.CommandLine.E);    // -e
+        if (config.isProcessLineEnds()) list.add(ParsingOptions.CommandLine.L); // -l
+        if (config.isAssumeLoop()) list.add(ParsingOptions.CommandLine.N);      // -n
+        if (config.isAssumePrinting()) list.add(ParsingOptions.CommandLine.P); // -p
+        if (config.isXFlag()) list.add(ParsingOptions.CommandLine.X);          // -x
+
+        return list.isEmpty() ? EnumSet.noneOf(ParsingOptions.CommandLine.class) : EnumSet.copyOf(list);
     }
 
     private void writeUnsignedInt(ByteList buf, int index, int value) {
@@ -276,12 +248,17 @@ public class ParserPrism extends Parser {
         buf.append(value >>> 24);
     }
 
-    private byte[] encodeEvalScopes(ByteList buf, StaticScope scope) {
+    private void encodeEvalScopes(ByteList buf, StaticScope scope) {
         int startIndex = buf.realSize();
+
+        // append uint 0 to reserve the space
         appendUnsignedInt(buf, 0);
+
+        // write the scopes to the buffer
         int count = encodeEvalScopesInner(buf, scope, 1);
+
+        // overwrite int 0 with scope count
         writeUnsignedInt(buf, startIndex, count);
-        return buf.bytes();
     }
 
     private int encodeEvalScopesInner(ByteList buf, StaticScope scope, int count) {
@@ -291,8 +268,13 @@ public class ParserPrism extends Parser {
 
         // once more for method scope
         String names[] = scope.getVariables();
+
+        // number of variables
         appendUnsignedInt(buf, names.length);
+
+        // forwarding flags
         buf.append(0);
+
         for (String name : names) {
             // Get the bytes "raw" (which we use ISO8859_1 for) as this is how we record these in StaticScope.
             byte[] bytes = name.getBytes(ISO8859_1Encoding.INSTANCE.getCharset());
@@ -327,23 +309,23 @@ public class ParserPrism extends Parser {
     @Override
     public ParseResult addGetsLoop(Ruby runtime, ParseResult result, boolean printing, boolean processLineEndings, boolean split) {
         var context = runtime.getCurrentContext();
-        List<Nodes.Node> newBody = new ArrayList<>();
+        List<Node> newBody = new ArrayList<>();
 
         if (processLineEndings) {
-            newBody.add(new Nodes.GlobalVariableWriteNode(-1, 0, 0, asSymbol(context, CommonByteLists.DOLLAR_BACKSLASH),
+            newBody.add(new GlobalVariableWriteNode(-1, 0, 0, asSymbol(context, CommonByteLists.DOLLAR_BACKSLASH),
                     new GlobalVariableReadNode(-1, 0, 0, asSymbol(context, CommonByteLists.DOLLAR_SLASH))));
         }
 
-        Nodes.GlobalVariableReadNode dollarUnderscore = new GlobalVariableReadNode(-1, 0, 0, asSymbol(context, DOLLAR_UNDERSCORE));
+        GlobalVariableReadNode dollarUnderscore = new GlobalVariableReadNode(-1, 0, 0, asSymbol(context, DOLLAR_UNDERSCORE));
 
-        List<Nodes.Node> whileBody = new ArrayList<>();
+        List<Node> whileBody = new ArrayList<>();
 
         if (processLineEndings) {
             whileBody.add(new CallNode(-1, 0, 0, (short) 0, dollarUnderscore, asSymbol(context, "chomp!"), null, null));
         }
         if (split) {
             whileBody.add(new GlobalVariableWriteNode(-1, 0, 0, asSymbol(context, "$F"),
-                    new Nodes.CallNode(-1, 0, 0, (short) 0, dollarUnderscore, asSymbol(context, "split"), null, null)));
+                    new CallNode(-1, 0, 0, (short) 0, dollarUnderscore, asSymbol(context, "split"), null, null)));
         }
 
         StatementsNode stmts = ((ProgramNode) result.getAST()).statements;
@@ -362,7 +344,7 @@ public class ParserPrism extends Parser {
 
         nodes = new Node[newBody.size()];
         newBody.toArray(nodes);
-        Nodes.ProgramNode newRoot = new Nodes.ProgramNode(-1, 0, 0, new RubySymbol[] {}, new StatementsNode(-1, 0, 0, nodes));
+        ProgramNode newRoot = new ProgramNode(-1, 0, 0, new RubySymbol[] {}, new StatementsNode(-1, 0, 0, nodes));
 
         ((ParseResultPrism) result).setRoot(newRoot);
 
