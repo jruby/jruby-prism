@@ -231,7 +231,7 @@ public abstract class ParserPrismBase extends Parser {
         if (config.isAssumePrinting()) list.add(ParsingOptions.CommandLine.P); // -p
         if (config.isXFlag()) list.add(ParsingOptions.CommandLine.X);          // -x
 
-        return EnumSet.copyOf(list);
+        return list.isEmpty() ? EnumSet.noneOf(ParsingOptions.CommandLine.class) : EnumSet.copyOf(list);
     }
 
     private void writeUnsignedInt(ByteList buf, int index, int value) {
