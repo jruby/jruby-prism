@@ -62,8 +62,8 @@ import org.jruby.util.KeyValuePair;
 import org.jruby.util.RegexpOptions;
 import org.jruby.util.StringSupport;
 import org.jruby.util.cli.Options;
-import org.prism.Nodes;
-import org.prism.Nodes.*;
+import org.ruby_lang.prism.Nodes;
+import org.ruby_lang.prism.Nodes.*;
 import org.jruby.prism.parser.ParseResultPrism;
 
 import java.math.BigInteger;

@@ -20,16 +20,16 @@ import org.jruby.runtime.load.LoadServiceResourceInputStream;
 import org.jruby.util.ByteList;
 import org.jruby.util.CommonByteLists;
 import org.jruby.util.io.ChannelHelper;
-import org.prism.Nodes.ArgumentsNode;
-import org.prism.Nodes.CallNode;
-import org.prism.Nodes.CallNodeFlags;
-import org.prism.Nodes.GlobalVariableReadNode;
-import org.prism.Nodes.GlobalVariableWriteNode;
-import org.prism.Nodes.Node;
-import org.prism.Nodes.ProgramNode;
-import org.prism.Nodes.StatementsNode;
-import org.prism.Nodes.WhileNode;
-import org.prism.ParsingOptions;
+import org.ruby_lang.prism.Nodes.ArgumentsNode;
+import org.ruby_lang.prism.Nodes.CallNode;
+import org.ruby_lang.prism.Nodes.CallNodeFlags;
+import org.ruby_lang.prism.Nodes.GlobalVariableReadNode;
+import org.ruby_lang.prism.Nodes.GlobalVariableWriteNode;
+import org.ruby_lang.prism.Nodes.Node;
+import org.ruby_lang.prism.Nodes.ProgramNode;
+import org.ruby_lang.prism.Nodes.StatementsNode;
+import org.ruby_lang.prism.Nodes.WhileNode;
+import org.ruby_lang.prism.ParsingOptions;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -69,7 +69,7 @@ public abstract class ParserPrismBase extends Parser {
 
         if (parserTiming) time = System.nanoTime();
         LoaderPrism loader = new LoaderPrism(runtime, serialized, source);
-        org.prism.ParseResult res = loader.load();
+        org.ruby_lang.prism.ParseResult res = loader.load();
         Encoding encoding = loader.getEncoding();
 
         if (parserTiming) {
@@ -81,8 +81,8 @@ public abstract class ParserPrismBase extends Parser {
         }
 
         if (res.warnings != null) {
-            for (org.prism.ParseResult.Warning warning: res.warnings) {
-                if (warning.level != org.prism.ParseResult.WarningLevel.WARNING_VERBOSE || runtime.isVerbose()) {
+            for (org.ruby_lang.prism.ParseResult.Warning warning: res.warnings) {
+                if (warning.level != org.ruby_lang.prism.ParseResult.WarningLevel.WARNING_VERBOSE || runtime.isVerbose()) {
                     runtime.getWarnings().warn(fileName, res.source.line(warning.location.startOffset), warning.message);
                 }
             }

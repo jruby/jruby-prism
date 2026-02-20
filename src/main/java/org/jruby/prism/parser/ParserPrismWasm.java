@@ -1,7 +1,7 @@
 package org.jruby.prism.parser;
 
 import org.jruby.Ruby;
-import org.prism.Prism;
+import org.jruby.parser.prism.wasm.Prism;
 
 public class ParserPrismWasm extends ParserPrismBase {
     private final Prism prism = new Prism();

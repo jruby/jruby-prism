@@ -3,9 +3,9 @@ package org.jruby.prism.parser;
 import org.jcodings.Encoding;
 import org.jruby.Ruby;
 import org.jruby.util.ByteList;
-import org.prism.Loader;
-import org.prism.Nodes;
-import org.prism.ParseResult;
+import org.ruby_lang.prism.Loader;
+import org.ruby_lang.prism.Nodes;
+import org.ruby_lang.prism.ParseResult;
 
 /**
  * Extends Loader to override some things which are not generated directly
