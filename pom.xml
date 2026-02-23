@@ -18,12 +18,6 @@
     <maven.compiler.target>21</maven.compiler.target>
   </properties>
 
-  <parent>
-    <groupId>org.sonatype.oss</groupId>
-    <artifactId>oss-parent</artifactId>
-    <version>9</version>
-  </parent>
-
   <issueManagement>
     <system>GitHub</system>
     <url>https://github.com/jruby/jruby-prism/issues</url>
