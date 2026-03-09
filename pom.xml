@@ -4,7 +4,7 @@
   <groupId>org.jruby</groupId>
   <artifactId>jruby-prism</artifactId>
   <packaging>jar</packaging>
-  <version>1.4.0</version>
+  <version>2.0.0-SNAPSHOT</version>
   <name>jruby-prism</name>
   <description>
     Java portion of JRuby Prism parser support.
@@ -12,15 +12,11 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <chicory.version>1.2.1</chicory.version>
+    <junit.version>5.12.1</junit.version>
     <maven.compiler.source>21</maven.compiler.source>
-    <maven.compiler.target>21</maven.compiler.target>    
+    <maven.compiler.target>21</maven.compiler.target>
   </properties>
-
-  <parent>
-    <groupId>org.sonatype.oss</groupId>
-    <artifactId>oss-parent</artifactId>
-    <version>9</version>
-  </parent>
 
   <issueManagement>
     <system>GitHub</system>
@@ -48,17 +44,41 @@
     </developer>
   </developers>
 
+  <repositories>
+    <repository>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+      <id>sonatype</id>
+      <url>https://central.sonatype.com/repository/maven-snapshots/</url>
+    </repository>
+  </repositories>
+
+  <dependencyManagement>
+    <dependencies>
+          <dependency>
+              <groupId>com.dylibso.chicory</groupId>
+              <artifactId>bom</artifactId>
+              <version>${chicory.version}</version>
+              <type>pom</type>
+              <scope>import</scope>
+          </dependency>
+      </dependencies>
+  </dependencyManagement>
+
   <dependencies>
     <dependency>
        <groupId>org.jruby</groupId>
        <artifactId>jruby-base</artifactId>
-       <version>10.0.0.0-SNAPSHOT</version>
+       <version>10.0.2.0</version>
     </dependency>
     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>4.13.1</version>
-      <scope>test</scope>
+      <groupId>org.jruby</groupId>
+      <artifactId>chicory-prism</artifactId>
+      <version>0.0.1-SNAPSHOT</version>
     </dependency>
   </dependencies>
 
@@ -104,42 +124,12 @@
         </configuration>
       </plugin>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-gpg-plugin</artifactId>
-        <version>1.5</version>
-        <executions>
-          <execution>
-            <id>sign-artifacts</id>
-            <phase>verify</phase>
-            <goals>
-              <goal>sign</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <artifactId>maven-source-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>attach-sources</id>
-            <goals>
-              <goal>jar-no-fork</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <artifactId>maven-javadoc-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>attach-javadocs</id>
-            <goals>
-              <goal>jar</goal>
-            </goals>
-          </execution>
-        </executions>
+        <groupId>org.sonatype.central</groupId>
+        <artifactId>central-publishing-maven-plugin</artifactId>
+        <version>0.7.0</version>
+        <extensions>true</extensions>
         <configuration>
-          <doclint>none</doclint>
+          <publishingServerId>central</publishingServerId>
         </configuration>
       </plugin>
     </plugins>
@@ -193,6 +183,57 @@
                    </goals>
                 </execution>
              </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>1.6</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+            <configuration>
+              <gpgArguments>
+                <gpgArgument>--pinentry-mode</gpgArgument>
+                <gpgArgument>loopback</gpgArgument>
+              </gpgArguments>
+            </configuration>
+          </plugin>
+          <plugin>
+            <artifactId>maven-source-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+            <configuration>
+              <doclint>none</doclint>
+            </configuration>
           </plugin>
         </plugins>
       </build>

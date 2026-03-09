@@ -62,8 +62,8 @@ import org.jruby.util.KeyValuePair;
 import org.jruby.util.RegexpOptions;
 import org.jruby.util.StringSupport;
 import org.jruby.util.cli.Options;
-import org.prism.Nodes;
-import org.prism.Nodes.*;
+import org.ruby_lang.prism.Nodes;
+import org.ruby_lang.prism.Nodes.*;
 import org.jruby.prism.parser.ParseResultPrism;
 
 import java.math.BigInteger;
@@ -731,10 +731,13 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             }
         }
 
+        boolean reusingLabels = false;
         if (node.isSafeNavigation()) {
             if (lazyLabel == null) {
                 lazyLabel = getNewLabel();
                 endLabel = getNewLabel();
+            } else {
+                reusingLabels = true;
             }
         }
 
@@ -758,9 +761,11 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
         if (node.isSafeNavigation()) {
             addInstr(new JumpInstr(endLabel));
-            addInstr(new LabelInstr(lazyLabel));
-            addInstr(new CopyInstr(result, nil()));
-            addInstr(new LabelInstr(endLabel));
+            if (!reusingLabels) { // This already exists.
+                addInstr(new LabelInstr(lazyLabel));
+                addInstr(new CopyInstr(result, nil()));
+                addInstr(new LabelInstr(endLabel));
+            }
         }
 
         return result;
@@ -1366,10 +1371,10 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                         if (!keysHack.add(hack)) getManager().getRuntime().getWarnings().warn("key :" + hack + " is duplicated and overwritten on line " + (getLine(key) + 1));
                     } else if (keyOperand instanceof Fixnum) {
                         long hack = ((Fixnum) keyOperand).value;
-                        if (!keysHack.add(new Long(hack))) getManager().getRuntime().getWarnings().warn("key " + hack + " is duplicated and overwritten on line " + (getLine(key) + 1));
+                        if (!keysHack.add(Long.valueOf(hack))) getManager().getRuntime().getWarnings().warn("key " + hack + " is duplicated and overwritten on line " + (getLine(key) + 1));
                     } else if (keyOperand instanceof Float) {
                         double hack = ((Float) keyOperand).value;
-                        if (!keysHack.add(new Double(hack))) getManager().getRuntime().getWarnings().warn("key " + hack + " is duplicated and overwritten on line " + (getLine(key) + 1));
+                        if (!keysHack.add(Double.valueOf(hack))) getManager().getRuntime().getWarnings().warn("key " + hack + " is duplicated and overwritten on line " + (getLine(key) + 1));
                     }
                 }
                 args.add(new KeyValuePair<>(keyOperand, buildWithOrder(((AssocNode) pair).value, hasAssignments)));
@@ -1470,7 +1475,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             // value of the regexp.  Adding an empty string will pick up the encoding from options (this
             // empty string is how legacy parsers do this but it naturally falls out of the parser.
             pieces = new Node[children.length + 1];
-            pieces[0] = new StringNode(0, 0, (short) 0, EMPTY.bytes());
+            pieces[0] = new StringNode(-1, 0, 0, (short) 0, EMPTY.bytes());
             pieces[1] = children[0];
         } else {
             pieces = children;
@@ -1603,7 +1608,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildMatchRequired(MatchRequiredNode node) {
-        return buildPatternCase(node.value, new Node[] { new InNode(0, 0, node.pattern, null) }, null);
+        return buildPatternCase(node.value, new Node[] { new InNode(-1, 0, 0, node.pattern, null) }, null);
     }
 
     private Operand buildMatchWrite(Variable result, MatchWriteNode node) {

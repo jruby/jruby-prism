@@ -5,7 +5,7 @@ import org.jruby.ParseResult;
 import org.jruby.prism.builder.IRBuilderPrism;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.DynamicScope;
-import org.prism.Nodes;
+import org.ruby_lang.prism.Nodes;
 
 public class ParseResultPrism implements ParseResult {
     final Encoding encoding;

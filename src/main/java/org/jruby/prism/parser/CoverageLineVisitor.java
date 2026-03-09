@@ -1,7 +1,7 @@
 package org.jruby.prism.parser;
 
-import org.prism.AbstractNodeVisitor;
-import org.prism.Nodes;
+import org.ruby_lang.prism.AbstractNodeVisitor;
+import org.ruby_lang.prism.Nodes;
 
 public class CoverageLineVisitor extends AbstractNodeVisitor<Void> {
 
