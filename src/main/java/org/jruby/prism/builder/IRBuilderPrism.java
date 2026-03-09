@@ -2204,6 +2204,10 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             Variable v = temp();
             addInstr(new ReceivePreReqdArgInstr(v, keywords, argIndex));
             addInstr(new PutGlobalVarInstr(target.name, v));
+        } else if (node instanceof CallTargetNode target) {
+            Variable v = temp();
+            addInstr(new ReceivePreReqdArgInstr(v, keywords, argIndex));
+            call(temp(), build(target.receiver), target.name, v);
         } else {
             throw notCompilable("Can't build required parameter node", node);
         }
