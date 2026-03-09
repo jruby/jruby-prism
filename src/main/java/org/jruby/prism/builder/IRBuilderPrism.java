@@ -2280,7 +2280,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             }
         }
         Operand value = buildYieldArgs(node.arguments != null ? node.arguments.arguments : null, flags);
-        addInstr(new YieldInstr(result, getYieldClosureVariable(), value, flags[0], unwrap));
+        addInstr(new YieldInstr(scope, result, getYieldClosureVariable(), value, flags[0], unwrap));
         return result;
     }
 
