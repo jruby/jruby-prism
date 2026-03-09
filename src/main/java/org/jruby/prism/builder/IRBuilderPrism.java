@@ -280,6 +280,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             return buildInterpolatedSymbol(result, (InterpolatedSymbolNode) node);
         } else if (node instanceof InterpolatedXStringNode) {
             return buildInterpolatedXString(result, (InterpolatedXStringNode) node);
+        } else if (node instanceof ItLocalVariableReadNode) {
+            return buildItRead();
         } else if (node instanceof KeywordHashNode) {
             return buildKeywordHash((KeywordHashNode) node, new int[1]); // FIXME: we don't care about flags but this is odd (seems to only be for array syntax with kwrest?).
         // KeywordParameterNode, KeywordRestParameterNode processed by call
@@ -642,6 +644,10 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                 addInstr(new ReceivePreReqdArgInstr(argumentResult(name), keywords, i));
             }
             addInstr(new CheckArityInstr(params.maximum, 0, false, params.maximum, keywords));
+        } else if (node instanceof ItParametersNode) {
+            Variable keywords = addResultInstr(new ReceiveKeywordsInstr(temp(), true, true));
+            Variable v = getLocalVariable(symbol("it"), 0);
+            addInstr(new ReceivePreReqdArgInstr(v, keywords, 0));
         } else {
             // FIXME: Missing locals?  Not sure how we handle those but I would have thought with a scope?
             buildParameters(((BlockParametersNode) node).parameters);
@@ -1465,6 +1471,10 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
     private Operand buildInterpolatedRegularExpression(Variable result, InterpolatedRegularExpressionNode node) {
         return buildDRegex(result, node.parts, calculateRegexpOptions(node.flags));
+    }
+
+    private Operand buildItRead() {
+        return getLocalVariable(symbol("it"), 0);
     }
 
     protected Operand buildDRegex(Variable result, Node[] children, RegexpOptions options) {
@@ -2717,6 +2727,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             return calculateSignature(((BlockParametersNode) parameters).parameters);
         } else if (parameters instanceof NumberedParametersNode) {
             return Signature.from(((NumberedParametersNode) parameters).maximum, 0, 0, 0, 0, Signature.Rest.NONE, -1);
+        } else if (parameters instanceof ItParametersNode) {
+            return Signature.from(1, 0, 0, 0, 0, Signature.Rest.NONE, -1);
         }
 
         throw notCompilable("Unknown signature for block parameters", parameters);
