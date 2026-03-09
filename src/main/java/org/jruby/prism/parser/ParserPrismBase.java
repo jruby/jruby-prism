@@ -312,39 +312,39 @@ public abstract class ParserPrismBase extends Parser {
         List<Node> newBody = new ArrayList<>();
 
         if (processLineEndings) {
-            newBody.add(new GlobalVariableWriteNode(-1, 0, 0, asSymbol(context, CommonByteLists.DOLLAR_BACKSLASH),
-                    new GlobalVariableReadNode(-1, 0, 0, asSymbol(context, CommonByteLists.DOLLAR_SLASH))));
+            newBody.add(new GlobalVariableWriteNode(0, 0, asSymbol(context, CommonByteLists.DOLLAR_BACKSLASH),
+                    new GlobalVariableReadNode(0, 0, asSymbol(context, CommonByteLists.DOLLAR_SLASH))));
         }
 
-        GlobalVariableReadNode dollarUnderscore = new GlobalVariableReadNode(-1, 0, 0, asSymbol(context, DOLLAR_UNDERSCORE));
+        GlobalVariableReadNode dollarUnderscore = new GlobalVariableReadNode(0, 0, asSymbol(context, DOLLAR_UNDERSCORE));
 
         List<Node> whileBody = new ArrayList<>();
 
         if (processLineEndings) {
-            whileBody.add(new CallNode(-1, 0, 0, (short) 0, dollarUnderscore, asSymbol(context, "chomp!"), null, null));
+            whileBody.add(new CallNode(0, 0, (short) 0, dollarUnderscore, asSymbol(context, "chomp!"), null, null));
         }
         if (split) {
-            whileBody.add(new GlobalVariableWriteNode(-1, 0, 0, asSymbol(context, "$F"),
-                    new CallNode(-1, 0, 0, (short) 0, dollarUnderscore, asSymbol(context, "split"), null, null)));
+            whileBody.add(new GlobalVariableWriteNode(0, 0, asSymbol(context, "$F"),
+                    new CallNode(0, 0, (short) 0, dollarUnderscore, asSymbol(context, "split"), null, null)));
         }
 
         StatementsNode stmts = ((ProgramNode) result.getAST()).statements;
         if (stmts != null && stmts.body != null) whileBody.addAll(Arrays.asList(stmts.body));
 
-        ArgumentsNode args = new ArgumentsNode(-1, 0, 0, (short) 0, new Node[] { dollarUnderscore });
-        if (printing) whileBody.add(new CallNode(-1, 0, 0, (short) 0, null, asSymbol(context, "print"), args, null));
+        ArgumentsNode args = new ArgumentsNode(0, 0, (short) 0, new Node[] { dollarUnderscore });
+        if (printing) whileBody.add(new CallNode(0, 0, (short) 0, null, asSymbol(context, "print"), args, null));
 
         Node[] nodes = new Node[whileBody.size()];
         whileBody.toArray(nodes);
-        StatementsNode statements = new StatementsNode(-1, 0, 0, nodes);
+        StatementsNode statements = new StatementsNode(0, 0, nodes);
 
-        newBody.add(new WhileNode(-1, 0, 0, (short) 0,
-                new CallNode(-1, 0, 0, CallNodeFlags.VARIABLE_CALL, null, asSymbol(context, "gets"), null, null),
+        newBody.add(new WhileNode(0, 0, (short) 0,
+                new CallNode(0, 0, CallNodeFlags.VARIABLE_CALL, null, asSymbol(context, "gets"), null, null),
                 statements));
 
         nodes = new Node[newBody.size()];
         newBody.toArray(nodes);
-        ProgramNode newRoot = new ProgramNode(-1, 0, 0, new RubySymbol[] {}, new StatementsNode(-1, 0, 0, nodes));
+        ProgramNode newRoot = new ProgramNode(0, 0, new RubySymbol[] {}, new StatementsNode(0, 0, nodes));
 
         ((ParseResultPrism) result).setRoot(newRoot);
 

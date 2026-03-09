@@ -1475,7 +1475,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             // value of the regexp.  Adding an empty string will pick up the encoding from options (this
             // empty string is how legacy parsers do this but it naturally falls out of the parser.
             pieces = new Node[children.length + 1];
-            pieces[0] = new StringNode(-1, 0, 0, (short) 0, EMPTY.bytes());
+            pieces[0] = new StringNode(0, 0, (short) 0, EMPTY.bytes());
             pieces[1] = children[0];
         } else {
             pieces = children;
@@ -1608,7 +1608,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildMatchRequired(MatchRequiredNode node) {
-        return buildPatternCase(node.value, new Node[] { new InNode(-1, 0, 0, node.pattern, null) }, null);
+        return buildPatternCase(node.value, new Node[] { new InNode(0, 0, node.pattern, null) }, null);
     }
 
     private Operand buildMatchWrite(Variable result, MatchWriteNode node) {

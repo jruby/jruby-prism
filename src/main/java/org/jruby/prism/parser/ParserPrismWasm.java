@@ -1,7 +1,7 @@
 package org.jruby.prism.parser;
 
 import org.jruby.Ruby;
-import org.jruby.parser.prism.wasm.Prism;
+import org.ruby_lang.prism.wasm.Prism;
 
 public class ParserPrismWasm extends ParserPrismBase {
     private final Prism prism = new Prism();
@@ -11,6 +11,6 @@ public class ParserPrismWasm extends ParserPrismBase {
     }
 
     protected synchronized byte[] parse(byte[] source, int sourceLength, byte[] metadata) {
-        return prism.serialize(metadata, source, sourceLength);
+        return prism.parse(source, 0, sourceLength, metadata);
     }
 }
