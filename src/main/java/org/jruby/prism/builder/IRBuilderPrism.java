@@ -614,7 +614,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         if (node instanceof MultiTargetNode) { // for loops
             buildBlockArgsAssignment(node, null, 0, false);
         } else if (node instanceof ClassVariableTargetNode || node instanceof LocalVariableTargetNode ||
-                node instanceof InstanceVariableTargetNode || node instanceof ConstantTargetNode) {
+                node instanceof InstanceVariableTargetNode || node instanceof ConstantTargetNode ||
+                node instanceof GlobalVariableTargetNode) {
             receivePreArg(node, keywords, 0);
         } else {
             throw notCompilable("missing arg processing for `for`", node);
@@ -2198,6 +2199,9 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             addInstr(new PutFieldInstr(buildSelf(), ((InstanceVariableTargetNode) node).name, v));
         } else if (node instanceof LocalVariableTargetNode) {  // blocks/for
             Variable v = getLocalVariable(((LocalVariableTargetNode) node).name, ((LocalVariableTargetNode) node).depth);
+            addInstr(new ReceivePreReqdArgInstr(v, keywords, argIndex));
+        } else if (node instanceof GlobalVariableTargetNode target) {
+            Variable v = (Variable) buildGlobalVar(temp(), target.name);
             addInstr(new ReceivePreReqdArgInstr(v, keywords, argIndex));
         } else {
             throw notCompilable("Can't build required parameter node", node);
