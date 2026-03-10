@@ -615,7 +615,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             buildBlockArgsAssignment(node, null, 0, false);
         } else if (node instanceof ClassVariableTargetNode || node instanceof LocalVariableTargetNode ||
                 node instanceof InstanceVariableTargetNode || node instanceof ConstantTargetNode ||
-                node instanceof GlobalVariableTargetNode || node instanceof CallTargetNode) {
+                node instanceof GlobalVariableTargetNode || node instanceof CallTargetNode ||
+                node instanceof IndexTargetNode) {
             receivePreArg(node, keywords, 0);
         } else {
             throw notCompilable("missing arg processing for `for`", node);
@@ -2205,9 +2206,23 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             addInstr(new ReceivePreReqdArgInstr(v, keywords, argIndex));
             addInstr(new PutGlobalVarInstr(target.name, v));
         } else if (node instanceof CallTargetNode target) {
-            Variable v = temp();
-            addInstr(new ReceivePreReqdArgInstr(v, keywords, argIndex));
-            call(temp(), build(target.receiver), target.name, v);
+            var v = addResultInstr(new ReceivePreReqdArgInstr(temp(), keywords, argIndex));
+            if (target.isSafeNavigation()) {
+                var receiver = build(target.receiver);
+                if_not(receiver, nil(),
+                        () -> call(temp(), receiver, target.name, v));
+            } else {
+                call(temp(), build(target.receiver), target.name, v);
+            }
+        } else if (node instanceof IndexTargetNode target) {
+            var v = addResultInstr(new ReceivePreReqdArgInstr(temp(), keywords, argIndex));
+            if (target.isSafeNavigation()) {
+                var receiver = build(target.receiver);
+                if_not(receiver, nil(),
+                        () -> call(temp(), receiver, symbol("[]="), addArg(buildArguments(target.arguments), v)));
+            } else {
+                call(temp(), build(target.receiver), symbol("[]="), addArg(buildArguments(target.arguments), v));
+            }
         } else {
             throw notCompilable("Can't build required parameter node", node);
         }
