@@ -980,12 +980,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildConstantWritePath(ConstantPathWriteNode node) {
-        return buildConstantWritePath(node.target, build(node.value));
-    }
-
-    // Multiple assignments provide the value otherwise it is grabbed from .value on the node.
-    private Operand buildConstantWritePath(ConstantPathNode path, Operand value) {
-        return putConstant(buildModuleParent(path.parent), path.name, value);
+        var path = node.target;
+        return putConstant(buildModuleParent(path.parent), path.name, build(node.value));
     }
 
     private Operand buildDef(DefNode node) {
