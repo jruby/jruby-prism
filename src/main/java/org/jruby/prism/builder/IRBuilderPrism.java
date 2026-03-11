@@ -1695,15 +1695,18 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
             switch (node) {
                 case CallTargetNode call -> {
+                    CallType callType = call.isIgnoreVisibility() ? CallType.FUNCTIONAL : CallType.NORMAL;
                     var receiver = reads.get(call.receiver);
                     if (call.isSafeNavigation()) {
                         if_not(receiver, nil(),
-                                () -> call(temp(), receiver, call.name, rhs));
+                                () -> _call(temp(), callType, receiver, call.name, rhs));
                     } else {
-                        call(temp(), receiver, call.name, rhs);
+                        _call(temp(), callType, receiver, call.name, rhs);
                     }
                 }
                 case IndexTargetNode index -> {
+                    // FIXME: we determine self.foo[] by requiring receiver to be `self` in AttrAssignInstr but we could
+                    //  use isIgnoreVisibility() that the parser provides.  We have no code path to do this though in AttrAssignInstr.
                     var receiver = reads.get(index.receiver);
                     Array holders = (Array) reads.get(index.arguments);
                     int flags = ((Integer) holders.get(holders.size() - 1)).value;
