@@ -36,6 +36,7 @@ import org.jruby.ir.operands.Float;
 import org.jruby.ir.operands.FrozenString;
 import org.jruby.ir.operands.Hash;
 import org.jruby.ir.operands.ImmutableLiteral;
+import org.jruby.ir.operands.Integer;
 import org.jruby.ir.operands.Label;
 import org.jruby.ir.operands.LocalVariable;
 import org.jruby.ir.operands.MutableString;
@@ -68,6 +69,7 @@ import org.jruby.prism.parser.ParseResultPrism;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -310,8 +312,9 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             return buildMissing((MissingNode) node);
         } else if (node instanceof ModuleNode) {
             return buildModule((ModuleNode) node);
-        } else if (node instanceof MultiWriteNode) {
-            return buildMultiWriteNode((MultiWriteNode) node);
+        // MultiTargetNode handled a few places internally
+        } else if (node instanceof MultiWriteNode multi) {
+            return buildMultiWriteOrTargetNode(multi.lefts, multi.rest, multi.rights, multi.value);
         } else if (node instanceof NextNode) {
             return buildNext((NextNode) node);
         } else if (node instanceof NilNode) {
@@ -524,11 +527,17 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         } else if (node instanceof InstanceVariableTargetNode) {
             addInstr(new PutFieldInstr(buildSelf(), ((InstanceVariableTargetNode) node).name, rhsVal));
         } else if (node instanceof MultiTargetNode) {
+            var multi = (MultiTargetNode) node;
             Variable rhs = addResultInstr(new ToAryInstr(temp(), rhsVal));
-            buildMultiAssignment(((MultiTargetNode) node).lefts, ((MultiTargetNode) node).rest, ((MultiTargetNode) node).rights, rhs);
-        } else if (node instanceof MultiWriteNode) { // FIXME: Is this possible with Multitarget now existing?
-            Variable rhs = addResultInstr(new ToAryInstr(temp(), rhsVal));
-            buildMultiAssignment(((MultiWriteNode) node).lefts, ((MultiWriteNode) node).rest, ((MultiWriteNode) node).rights, rhs);
+            Map<Node, Operand> reads = new HashMap<>();
+            final List<Tuple<Node, ResultInstr>> assigns = new ArrayList<>(4);
+            buildMultiAssignment(multi.lefts, multi.rest, multi.rights, rhs, reads, assigns);
+
+            for (Tuple<Node, ResultInstr> assign: assigns) {
+                addInstr((Instr) assign.b);
+            }
+
+            buildAssignment(reads, assigns);
         } else if (node instanceof RequiredParameterNode) {
             RequiredParameterNode variable = (RequiredParameterNode) node;
             copy(getLocalVariable(variable.name, 0), rhsVal);
@@ -1648,38 +1657,131 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                 getLine(node), getEndLine(node));
     }
 
-    private Operand buildMultiWriteNode(MultiWriteNode node) {
-        Variable value = getValueInTemporaryVariable(build(node.value));
-        Variable rhs = node.value instanceof ArrayNode ? value : addResultInstr(new ToAryInstr(temp(), value));
+    private Operand buildMultiWriteOrTargetNode(Node[] lefts, Node rest, Node[] rights, Object value) {
+        var values = temp();
+        Map<Node, Operand> reads = new HashMap<>();
+        final List<Tuple<Node, ResultInstr>> assigns = new ArrayList<>(4);
+        buildMultiAssignment(lefts, rest, rights, values, reads, assigns);
 
-        buildMultiAssignment(node.lefts, node.rest, node.rights, rhs);
+        Operand builtValue;
+        if (value instanceof Node node) {
+            builtValue = getValueInTemporaryVariable(build(node));
 
-        return value;
+            if (value instanceof ArrayNode) {
+                copy(values, builtValue);
+            } else {
+                addResultInstr(new ToAryInstr(values, builtValue));
+            }
+        } else {
+            builtValue = (Operand) value;
+            copy(values, builtValue);
+        }
+
+        for (Tuple<Node, ResultInstr> assign: assigns) {
+            addInstr((Instr) assign.b);
+        }
+
+        buildAssignment(reads, assigns);
+
+        return builtValue;
+    }
+
+    // This method is called to build assignments for a multiple-assignment instruction
+    protected void buildAssignment(Map<Node, Operand> reads, List<Tuple<Node, ResultInstr>> assigns) {
+
+        for (var assign: assigns) {
+            var node = assign.a;
+            var rhs = assign.b.getResult();
+
+            switch (node) {
+                case CallTargetNode call -> buildAttrAssignAssignment(call.receiver, call.name, Node.EMPTY_ARRAY, rhs);
+                case IndexTargetNode index -> {
+                    var receiver = reads.get(index.receiver);
+                    Array holders = (Array) reads.get(index.arguments);
+                    int flags = ((Integer) holders.get(holders.size() - 1)).value;
+                    Operand[] args = new Operand[holders.size() - 1];
+                    System.arraycopy(holders.getElts(), 0, args, 0, args.length);
+                    args = addArg(args, rhs);
+                    addInstr(AttrAssignInstr.create(scope, receiver, symbol("[]="), args, flags, scope.maybeUsingRefinements()));
+                }
+                case ClassVariableTargetNode cvar -> addInstr(new PutClassVariableInstr(classVarDefinitionContainer(), cvar.name, rhs));
+                case ConstantPathTargetNode constpath -> putConstant(reads.get(constpath), constpath.name, rhs);
+                case ConstantTargetNode consty -> addInstr(new PutConstInstr(getCurrentModuleVariable(), consty.name, rhs));
+                case LocalVariableTargetNode lvar -> copy(getLocalVariable(lvar.name, lvar.depth), rhs);
+                case GlobalVariableTargetNode gvar -> addInstr(new PutGlobalVarInstr(gvar.name, rhs));
+                case InstanceVariableTargetNode ivar -> addInstr(new PutFieldInstr(buildSelf(), ivar.name, rhs));
+                case MultiTargetNode _m -> { } // handled in processReads()
+                case RequiredParameterNode req -> copy(getLocalVariable(req.name, 0), rhs);
+                case ImplicitRestNode _r -> { } // This is assigned to nothing
+                case SplatNode _r -> { } // This is splat where expression is null
+                default -> throw notCompilable("Can't build assignment node", node);
+            }
+        }
     }
 
     // SplatNode, MultiWriteNode, LocalVariableWrite and lots of other normal writes
-    private void buildMultiAssignment(Node[] pre, Node rest, Node[] post, Operand values) {
-        final List<Tuple<Node, Variable>> assigns = new ArrayList<>();
-
-        for (int i = 0; i < pre.length; i++) {
-            assigns.add(new Tuple<>(pre[i], addResultInstr(new ReqdArgMultipleAsgnInstr(temp(), values, i))));
+    private void buildMultiAssignment(Node[] pre, Node rest, Node[] post, Operand values,
+                                      Map<Node, Operand> reads, List<Tuple<Node, ResultInstr>> assigns) {
+        int i = 0;
+        for (var an: pre) {
+            var get = new ReqdArgMultipleAsgnInstr(temp(), values, i);
+            assigns.add(new Tuple<>(an, get));
+            processReads(get.getResult(), assigns, reads, an);
+            i++;
         }
 
         if (rest != null) {
             if (rest instanceof SplatNode) {
                 Node realTarget = ((SplatNode) rest).expression;
-                assigns.add(new Tuple<>(realTarget, addResultInstr(new RestArgMultipleAsgnInstr(temp(), values, 0, pre.length, post.length))));
+                var get = new RestArgMultipleAsgnInstr(temp(), values, 0, pre.length, post.length);
+                if (realTarget == null) {
+                    assigns.add(new Tuple<>(rest, get));
+                } else {
+                    assigns.add(new Tuple<>(realTarget, get));
+                }
+                processReads(get.getResult(), assigns, reads, rest);
             } else {
-                assigns.add(new Tuple<>(null, addResultInstr(new RestArgMultipleAsgnInstr(temp(), values, 0, pre.length, post.length))));
+                var get = new RestArgMultipleAsgnInstr(temp(), values, 0, pre.length, post.length);
+                assigns.add(new Tuple<>(rest, get));
+                processReads(get.getResult(), assigns, reads, rest);
             }
         }
 
-        for (int j = 0; j < post.length; j++) {
-            assigns.add(new Tuple<>(post[j], addResultInstr(new ReqdArgMultipleAsgnInstr(temp(), values, j, pre.length, post.length))));
+        int j = 0;
+        for (var an: post) {
+            var get = new ReqdArgMultipleAsgnInstr(temp(), values, j, i, post.length);
+            assigns.add(new Tuple<>(an, get));
+            processReads(get.getResult(), assigns, reads, an);
+            j++;
         }
+    }
 
-        for (Tuple<Node, Variable> assign: assigns) {
-            buildAssignment(assign.a, assign.b);
+    private void processReads(Variable result, List<Tuple<Node, ResultInstr>> assigns, Map<Node, Operand> reads,
+                              Node node) {
+        switch(node) {
+            case IndexTargetNode index:
+                reads.put(index.receiver, build(index.receiver));
+                Node[] arguments = index.arguments == null ? Node.EMPTY_ARRAY : index.arguments.arguments;
+                int[] flags = new int[] { 0 };
+                Operand[] args = buildCallArgsArray(arguments, flags);
+                Operand[] hackyArgs = new Operand[args.length + 1];
+                System.arraycopy(args, 0, hackyArgs, 0, args.length);
+                hackyArgs[args.length] = new Integer(flags[0]);
+                reads.put(index.arguments, new Array(hackyArgs));
+                break;
+            case ClassVariableTargetNode cvar:
+                reads.put(node, classVarDefinitionContainer());
+                break;
+            case ConstantPathTargetNode constpath:
+                reads.put(node, buildModuleParent(((ConstantPathTargetNode) node).parent));
+                break;
+            case MultiTargetNode multi:
+                var subRet = temp();
+                assigns.add(new Tuple<>(multi, new ToAryInstr(subRet, result)));
+                buildMultiAssignment(multi.lefts, multi.rest, multi.rights, subRet, reads, assigns);
+                break;
+            default:
+                break;
         }
     }
 
@@ -1827,7 +1929,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private ImmutableLiteral asRationalValue(Object value) {
-        return value instanceof Integer ? new Fixnum((int) value) :
+        return value instanceof java.lang.Integer ? new Fixnum((int) value) :
                 value instanceof Long ? new Fixnum((long) value) :
                         new Bignum((BigInteger) value);
     }
@@ -2176,12 +2278,12 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             addArgumentDescription(ArgumentType.req, name);
 
             addInstr(new ReceivePreReqdArgInstr(argumentResult(name), keywords, argIndex));
-        } else if (node instanceof MultiTargetNode) { // methods
+        } else if (node instanceof MultiTargetNode multi) { // methods
             Variable v = temp();
             addInstr(new ReceivePreReqdArgInstr(v, keywords, argIndex));
             addArgumentDescription(ArgumentType.anonreq, null);
             Variable rhs = addResultInstr(new ToAryInstr(temp(), v));
-            buildMultiAssignment(((MultiTargetNode) node).lefts, ((MultiTargetNode) node).rest, ((MultiTargetNode) node).rights, rhs);
+            buildMultiWriteOrTargetNode(multi.lefts, multi.rest, multi.rights, rhs);
         } else if (node instanceof ClassVariableTargetNode) {  // blocks/for
             Variable v = temp();
             addInstr(new ReceivePreReqdArgInstr(v, keywords, argIndex));
@@ -2231,7 +2333,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             addArgumentDescription(ArgumentType.req, argName);
 
             addInstr(new ReceivePostReqdArgInstr(argumentResult(argName), keywords, argIndex, preCount, optCount, hasRest, postCount));
-        } else if (node instanceof MultiTargetNode) {
+        } else if (node instanceof MultiTargetNode multi) {
             Variable v = temp();
             addInstr(new ReceivePostReqdArgInstr(v, keywords, argIndex, preCount, optCount, hasRest, postCount));
 
@@ -2240,7 +2342,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             Variable tmp = temp();
             addInstr(new ToAryInstr(tmp, v));
 
-            buildMultiAssignment(((MultiTargetNode) node).lefts, ((MultiTargetNode) node).rest, ((MultiTargetNode) node).rights, tmp);
+            buildMultiWriteOrTargetNode(multi.lefts, multi.rest, multi.rights, tmp);
         } else {
             throw notCompilable("Can't build required parameter node", node);
         }
@@ -2268,7 +2370,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
     @Override
     protected void buildWhenArgs(WhenNode whenNode, Operand testValue, Label bodyLabel,
-                                 Set<IRubyObject> seenLiterals, Map<IRubyObject, Integer> origLocs) {
+                                 Set<IRubyObject> seenLiterals, Map<IRubyObject, java.lang.Integer> origLocs) {
         Variable eqqResult = temp();
         Node[] exprNodes = whenNode.conditions;
 
