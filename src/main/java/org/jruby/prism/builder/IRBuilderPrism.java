@@ -1694,15 +1694,28 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             var rhs = assign.b.getResult();
 
             switch (node) {
-                case CallTargetNode call -> buildAttrAssignAssignment(call.receiver, call.name, Node.EMPTY_ARRAY, rhs);
+                case CallTargetNode call -> {
+                    var receiver = reads.get(call.receiver);
+                    if (call.isSafeNavigation()) {
+                        if_not(receiver, nil(),
+                                () -> call(temp(), receiver, call.name, rhs));
+                    } else {
+                        call(temp(), receiver, call.name, rhs);
+                    }
+                }
                 case IndexTargetNode index -> {
                     var receiver = reads.get(index.receiver);
                     Array holders = (Array) reads.get(index.arguments);
                     int flags = ((Integer) holders.get(holders.size() - 1)).value;
-                    Operand[] args = new Operand[holders.size() - 1];
-                    System.arraycopy(holders.getElts(), 0, args, 0, args.length);
-                    args = addArg(args, rhs);
-                    addInstr(AttrAssignInstr.create(scope, receiver, symbol("[]="), args, flags, scope.maybeUsingRefinements()));
+                    Operand[] nargs = new Operand[holders.size() - 1];
+                    System.arraycopy(holders.getElts(), 0, nargs, 0, nargs.length);
+                    Operand[] args = addArg(nargs, rhs);
+                    if (index.isSafeNavigation()) {
+                        if_not(receiver, nil(),
+                                () -> addInstr(AttrAssignInstr.create(scope, receiver, symbol("[]="), args, flags, scope.maybeUsingRefinements())));
+                    } else {
+                        addInstr(AttrAssignInstr.create(scope, receiver, symbol("[]="), args, flags, scope.maybeUsingRefinements()));
+                    }
                 }
                 case ClassVariableTargetNode cvar -> addInstr(new PutClassVariableInstr(classVarDefinitionContainer(), cvar.name, rhs));
                 case ConstantPathTargetNode constpath -> putConstant(reads.get(constpath), constpath.name, rhs);
@@ -1759,6 +1772,9 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     private void processReads(Variable result, List<Tuple<Node, ResultInstr>> assigns, Map<Node, Operand> reads,
                               Node node) {
         switch(node) {
+            case CallTargetNode call:
+                reads.put(call.receiver, build(call.receiver));
+                break;
             case IndexTargetNode index:
                 reads.put(index.receiver, build(index.receiver));
                 Node[] arguments = index.arguments == null ? Node.EMPTY_ARRAY : index.arguments.arguments;
@@ -1773,7 +1789,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                 reads.put(node, classVarDefinitionContainer());
                 break;
             case ConstantPathTargetNode constpath:
-                reads.put(node, buildModuleParent(((ConstantPathTargetNode) node).parent));
+                reads.put(node, buildModuleParent(constpath.parent));
                 break;
             case MultiTargetNode multi:
                 var subRet = temp();
