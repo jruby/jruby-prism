@@ -1081,6 +1081,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                 node instanceof ClassVariableOperatorWriteNode || node instanceof ClassVariableOrWriteNode ||
                 node instanceof ConstantAndWriteNode || node instanceof ConstantOrWriteNode ||
                 node instanceof ConstantPathWriteNode || node instanceof ConstantWriteNode ||
+                node instanceof ConstantPathAndWriteNode ||node instanceof ConstantPathOrWriteNode ||
+                node instanceof ConstantPathOperatorWriteNode ||
                 node instanceof InstanceVariableAndWriteNode || node instanceof InstanceVariableOrWriteNode ||
                 node instanceof InstanceVariableOperatorWriteNode ||
                 node instanceof LocalVariableWriteNode ||
