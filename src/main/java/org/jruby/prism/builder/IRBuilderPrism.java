@@ -1775,10 +1775,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     private void processReads(Variable result, List<Tuple<Node, ResultInstr>> assigns, Map<Node, Operand> reads,
                               Node node) {
         switch(node) {
-            case CallTargetNode call:
-                reads.put(call.receiver, build(call.receiver));
-                break;
-            case IndexTargetNode index:
+            case CallTargetNode call -> reads.put(call.receiver, build(call.receiver));
+            case IndexTargetNode index -> {
                 reads.put(index.receiver, build(index.receiver));
                 Node[] arguments = index.arguments == null ? Node.EMPTY_ARRAY : index.arguments.arguments;
                 int[] flags = new int[] { 0 };
@@ -1787,20 +1785,15 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                 System.arraycopy(args, 0, hackyArgs, 0, args.length);
                 hackyArgs[args.length] = new Integer(flags[0]);
                 reads.put(index.arguments, new Array(hackyArgs));
-                break;
-            case ClassVariableTargetNode cvar:
-                reads.put(node, classVarDefinitionContainer());
-                break;
-            case ConstantPathTargetNode constpath:
-                reads.put(node, buildModuleParent(constpath.parent));
-                break;
-            case MultiTargetNode multi:
+            }
+            case ClassVariableTargetNode _cvar -> reads.put(node, classVarDefinitionContainer());
+            case ConstantPathTargetNode constpath -> reads.put(node, buildModuleParent(constpath.parent));
+            case MultiTargetNode multi -> {
                 var subRet = temp();
                 assigns.add(new Tuple<>(multi, new ToAryInstr(subRet, result)));
                 buildMultiAssignment(multi.lefts, multi.rest, multi.rights, subRet, reads, assigns);
-                break;
-            default:
-                break;
+            }
+            default -> {}
         }
     }
 
