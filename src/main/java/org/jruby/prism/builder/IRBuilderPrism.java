@@ -760,14 +760,14 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
         // The receiver has to be built *before* call arguments are built
         // to preserve expected code execution order
-        // FIXME: this always builds with order (lacking containsVariableAssignment() in prism).
+        boolean preserveOrder = containsVariableAssignment(node.receiver);
         Operand receiver;
         if (callType == CallType.FUNCTIONAL) {
             receiver = buildSelf();
         } else if (node.receiver instanceof CallNode && ((CallNode) node.receiver).isSafeNavigation()) {
-            receiver = buildLazyWithOrder((CallNode) node.receiver, lazyLabel, endLabel, true);
+            receiver = buildLazyWithOrder((CallNode) node.receiver, lazyLabel, endLabel, preserveOrder);
         } else {
-            receiver = buildWithOrder(node.receiver, true);
+            receiver = buildWithOrder(node.receiver, preserveOrder);
         }
 
         if (node.isSafeNavigation()) addInstr(new BNilInstr(lazyLabel, receiver));
@@ -2510,6 +2510,9 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     // are just operands so we only need to be aware of these being used within assignments.
     @Override
     protected boolean containsVariableAssignment(Node node) {
+        if (node instanceof ParenthesesNode parens) return containsVariableAssignment(parens.body);
+        if (node instanceof StatementsNode statements) return containsVariableAssignment(statements.body);
+
         if (node instanceof LocalVariableWriteNode ||
                 node instanceof LocalVariableOperatorWriteNode ||
                 node instanceof LocalVariableAndWriteNode ||
