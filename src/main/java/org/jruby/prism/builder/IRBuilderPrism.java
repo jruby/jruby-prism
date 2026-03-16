@@ -209,7 +209,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             return buildConstantWritePath((ConstantPathWriteNode) node);
         // ConstantPathTargetNode processed in multiple assignment
         } else if (node instanceof ConstantReadNode) {
-            return buildConstantRead((ConstantReadNode) node);
+            return buildConstantRead(result, (ConstantReadNode) node);
         } else if (node instanceof ConstantWriteNode) {
             return buildConstantWrite((ConstantWriteNode) node);
         } else if (node instanceof DefNode) {
@@ -980,8 +980,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         return buildOpAsgnConstDeclOr(node.target, node.value, symbol(determineBaseName(node.target)));
     }
 
-    private Operand buildConstantRead(ConstantReadNode node) {
-        return addResultInstr(new SearchConstInstr(temp(), CurrentScope.INSTANCE, node.name, false));
+    private Operand buildConstantRead(Variable result, ConstantReadNode node) {
+        return searchConst(result, node.name);
     }
 
     private Operand buildConstantWrite(ConstantWriteNode node) {
