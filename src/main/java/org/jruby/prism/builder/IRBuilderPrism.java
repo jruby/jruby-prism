@@ -310,22 +310,6 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         return build(result, node.value);
     }
 
-    private Operand[] buildNodeList(Node[] list) {
-        if (list == null || list.length == 0) return Operand.EMPTY_ARRAY;
-
-        Operand[] args = new Operand[list.length];
-        for (int i = 0; i < list.length; i++) {
-            args[i] = build(list[i]);
-        }
-
-        return args;
-    }
-
-    private Operand buildArgumentsAsArgument(ArgumentsNode node) {
-        Operand[] args = buildArguments(node);
-        return args.length == 0 ? nil() : args.length == 1 ? args[0] : new Array(args);
-    }
-
     private Operand buildArray(ArrayNode node) {
         Node[] children = node.elements;
         Operand[] elts = new Operand[children.length];
@@ -431,10 +415,6 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         } else {
             throw notCompilable("Can't build assignment node", node);
         }
-    }
-
-    private Operand buildModuleParent(Node parent) {
-        return parent == null ? getCurrentModuleVariable() : build(parent);
     }
 
     @Override
@@ -2876,5 +2856,25 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         addInstr(new LabelInstr(done));
 
         return result;
+    }
+
+    private Operand[] buildNodeList(Node[] list) {
+        if (list == null || list.length == 0) return Operand.EMPTY_ARRAY;
+
+        Operand[] args = new Operand[list.length];
+        for (int i = 0; i < list.length; i++) {
+            args[i] = build(list[i]);
+        }
+
+        return args;
+    }
+
+    private Operand buildArgumentsAsArgument(ArgumentsNode node) {
+        Operand[] args = buildArguments(node);
+        return args.length == 0 ? nil() : args.length == 1 ? args[0] : new Array(args);
+    }
+
+    private Operand buildModuleParent(Node parent) {
+        return parent == null ? getCurrentModuleVariable() : build(parent);
     }
 }
