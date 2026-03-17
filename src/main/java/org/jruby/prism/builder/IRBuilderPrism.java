@@ -144,257 +144,142 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
         if (node.hasNewLineFlag()) determineIfWeNeedLineNumber(getLine(node), true, false, node instanceof DefNode);
 
-        if (node instanceof AliasGlobalVariableNode) {
-            return buildAliasGlobalVariable((AliasGlobalVariableNode) node);
-        } else if (node instanceof AliasMethodNode) {
-            return buildAliasMethod((AliasMethodNode) node);
-        } else if (node instanceof AndNode) {
-            return buildAnd((AndNode) node);
-        } else if (node instanceof ArrayNode) {
-            return buildArray((ArrayNode) node);                   // MISSING: ArrayPatternNode
-        } else if (node instanceof AssocSplatNode) {
-            return buildAssocSplat(result, (AssocSplatNode) node);
-        } else if (node instanceof BackReferenceReadNode) {
-            return buildBackReferenceRead(result, (BackReferenceReadNode) node);
-        } else if (node instanceof BeginNode) {
-            return buildBegin((BeginNode) node);
-        } else if (node instanceof BlockArgumentNode) {
-            return buildBlockArgument((BlockArgumentNode) node);
-        } else if (node instanceof BlockNode) {
-            return buildBlock((BlockNode) node);
-        // BlockParameterNode processed during call building.
-        } else if (node instanceof BreakNode) {
-            return buildBreak((BreakNode) node);
-        } else if (node instanceof CallNode) {
-            return buildCall(result, (CallNode) node, ((CallNode) node).name);
-        } else if (node instanceof CallAndWriteNode) {
-            return buildCallAndWrite((CallAndWriteNode) node);
-        } else if (node instanceof CallOrWriteNode) {
-            return buildCallOrWrite((CallOrWriteNode) node);
-        } else if (node instanceof CallOperatorWriteNode) { // foo.bar += baz
-            return buildCallOperatorWrite((CallOperatorWriteNode) node);
-        } else if (node instanceof CaseNode) {
-            return buildCase((CaseNode) node);
-        } else if (node instanceof CaseMatchNode) {
-            return buildCaseMatch((CaseMatchNode) node);
-        } else if (node instanceof ClassNode) {
-            return buildClass((ClassNode) node);
-        } else if (node instanceof ClassVariableAndWriteNode) {
-            return buildClassAndVariableWrite((ClassVariableAndWriteNode) node);
-        } else if (node instanceof ClassVariableOperatorWriteNode) {
-            return buildClassVariableOperatorWrite((ClassVariableOperatorWriteNode) node);
-        } else if (node instanceof ClassVariableOrWriteNode) {
-            return buildClassOrVariableWrite((ClassVariableOrWriteNode) node);
-        } else if (node instanceof ClassVariableReadNode) {
-            return buildClassVariableRead(result, (ClassVariableReadNode) node);
-        } else if (node instanceof ClassVariableWriteNode) {
-            return buildClassVariableWrite((ClassVariableWriteNode) node);
-        } else if (node instanceof ConstantAndWriteNode) {
-            return buildConstantAndWrite((ConstantAndWriteNode) node);
-        } else if (node instanceof ConstantOperatorWriteNode) {
-            return buildConstantOperatorWrite((ConstantOperatorWriteNode) node);
-        } else if (node instanceof ConstantOrWriteNode) {
-            return buildConstantOrWrite((ConstantOrWriteNode) node);
-        } else if (node instanceof ConstantPathNode) {
-            return buildConstantPath(result, (ConstantPathNode) node);
-        } else if (node instanceof ConstantPathAndWriteNode) {
-            return buildConstantPathAndWrite((ConstantPathAndWriteNode) node);
-        } else if (node instanceof ConstantPathOperatorWriteNode) {
-            return buildConstantPathOperatorWrite((ConstantPathOperatorWriteNode) node);
-        } else if (node instanceof ConstantPathOrWriteNode) {
-            return buildConstantPathOrWrite((ConstantPathOrWriteNode) node);
-        } else if (node instanceof ConstantPathOrWriteNode) {
-            return buildConstantOrWritePath((ConstantPathOrWriteNode) node);
-        } else if (node instanceof ConstantPathWriteNode) {
-            return buildConstantWritePath((ConstantPathWriteNode) node);
-        // ConstantPathTargetNode processed in multiple assignment
-        } else if (node instanceof ConstantReadNode) {
-            return buildConstantRead(result, (ConstantReadNode) node);
-        } else if (node instanceof ConstantWriteNode) {
-            return buildConstantWrite((ConstantWriteNode) node);
-        } else if (node instanceof DefNode) {
-            return buildDef((DefNode) node);
-        } else if (node instanceof DefinedNode) {
-            return buildDefined((DefinedNode) node);
-        } else if (node instanceof ElseNode) {
-            return buildElse((ElseNode) node);
-        } else if (node instanceof EmbeddedVariableNode) {
-            return build(((EmbeddedVariableNode) node).variable);
-        // EmbeddedStatementsNode handle in interpolated processing
-        // MISSING: EnsureNode ???? begin will process stuff (and possibly ensure but it is unclear)
-        } else if (node instanceof FalseNode) {
-            return fals();
-        } else if (node instanceof FloatNode) {                    // MISSING: FindPatternNode
-            return buildFloat((FloatNode) node);
-        } else if (node instanceof FlipFlopNode) {
-            return buildFlipFlop((FlipFlopNode) node);
-        } else if (node instanceof ForNode) {
-            return buildFor((ForNode) node);
-        // ForwardingArgumentsNode, ForwardingParametersNode process by def and call sides respectively
-        } else if (node instanceof ForwardingSuperNode) {
-            return buildForwardingSuper(result, (ForwardingSuperNode) node);
-        } else if (node instanceof GlobalVariableAndWriteNode) {
-            return buildGlobalVariableAndWrite((GlobalVariableAndWriteNode) node);
-        } else if (node instanceof GlobalVariableOperatorWriteNode) {
-            return buildGlobalVariableOperatorWrite((GlobalVariableOperatorWriteNode) node);
-        } else if (node instanceof GlobalVariableOrWriteNode) {
-            return buildGlobalVariableOrWrite((GlobalVariableOrWriteNode) node);
-        } else if (node instanceof GlobalVariableReadNode) {
-            return buildGlobalVariableRead(result, (GlobalVariableReadNode) node);
-        // GlobalVariableTargetNode processed by muliple assignment
-        } else if (node instanceof GlobalVariableWriteNode) {
-            return buildGlobalVariableWrite((GlobalVariableWriteNode) node);
-        } else if (node instanceof HashNode) {
-            return buildHash(((HashNode) node).elements, containsVariableAssignment(node));
-        } else if (node instanceof IfNode) {
-            return buildIf(result, (IfNode) node);
-        } else if (node instanceof ImaginaryNode) {
-            return buildImaginary((ImaginaryNode) node);
-        } else if (node instanceof ImplicitNode) {
-            // Making a huge assumption the implicit node is what we always want for execution?
-            return build(((ImplicitNode) node).value);
-        } else if (node instanceof IndexAndWriteNode) {
-            return buildIndexAndWrite((IndexAndWriteNode) node);
-        } else if (node instanceof IndexOrWriteNode) {
-            return buildIndexOrWrite((IndexOrWriteNode) node);
-        } else if (node instanceof IndexOperatorWriteNode) {
-            return buildIndexOperatorWrite((IndexOperatorWriteNode) node);
-        } else if (node instanceof InstanceVariableAndWriteNode) {
-            return buildInstanceVariableAndWrite((InstanceVariableAndWriteNode) node);
-        } else if (node instanceof InstanceVariableOperatorWriteNode) {
-            return buildInstanceVariableOperatorWrite((InstanceVariableOperatorWriteNode) node);
-        } else if (node instanceof InstanceVariableOrWriteNode) {
-            return buildInstanceVariableOrWrite((InstanceVariableOrWriteNode) node);
-        } else if (node instanceof InstanceVariableReadNode) {
-            return buildInstanceVariableRead((InstanceVariableReadNode) node);
-        // InstanceVariableTargetNode processed by multiple assignment
-        } else if (node instanceof InstanceVariableWriteNode) {
-            return buildInstanceVariableWrite((InstanceVariableWriteNode) node);
-        } else if (node instanceof IntegerNode) {
-            return buildInteger((IntegerNode) node);
-        } else if (node instanceof InterpolatedMatchLastLineNode) {
-            return buildInterpolatedMatchLastLine(result, (InterpolatedMatchLastLineNode) node);
-        } else if (node instanceof InterpolatedRegularExpressionNode) {
-            return buildInterpolatedRegularExpression(result, (InterpolatedRegularExpressionNode) node);
-        } else if (node instanceof InterpolatedStringNode) {
-            return buildInterpolatedString(result, (InterpolatedStringNode) node);
-        } else if (node instanceof InterpolatedSymbolNode) {
-            return buildInterpolatedSymbol(result, (InterpolatedSymbolNode) node);
-        } else if (node instanceof InterpolatedXStringNode) {
-            return buildInterpolatedXString(result, (InterpolatedXStringNode) node);
-        } else if (node instanceof ItLocalVariableReadNode) {
-            return buildItRead();
-        } else if (node instanceof KeywordHashNode) {
-            return buildKeywordHash((KeywordHashNode) node, new int[1]); // FIXME: we don't care about flags but this is odd (seems to only be for array syntax with kwrest?).
-        // KeywordParameterNode, KeywordRestParameterNode processed by call
-        } else if (node instanceof LambdaNode) {
-            return buildLambda((LambdaNode) node);
-        } else if (node instanceof LocalVariableAndWriteNode) {
-            return buildLocalAndVariableWrite((LocalVariableAndWriteNode) node);
-        } else if (node instanceof LocalVariableOperatorWriteNode) {
-            return buildLocalVariableOperatorWrite((LocalVariableOperatorWriteNode) node);
-        } else if (node instanceof LocalVariableOrWriteNode) {
-            return buildLocalOrVariableWrite((LocalVariableOrWriteNode) node);
-        } else if (node instanceof LocalVariableReadNode) {
-            return buildLocalVariableRead((LocalVariableReadNode) node);
-        // LocalVariableTargetNode processed by multiple assignment
-        } else if (node instanceof LocalVariableWriteNode) {
-            return buildLocalVariableWrite((LocalVariableWriteNode) node);
-        } else if (node instanceof MatchLastLineNode) {
-            return buildMatchLastLine(result, (MatchLastLineNode) node);
-        } else if (node instanceof MatchPredicateNode) {
-            return buildMatchPredicate((MatchPredicateNode) node);
-        } else if (node instanceof MatchRequiredNode) {
-            return buildMatchRequired((MatchRequiredNode) node);
-        } else if (node instanceof MatchWriteNode) {
-            return buildMatchWrite(result, (MatchWriteNode) node);
-        } else if (node instanceof MissingNode) {
-            return buildMissing((MissingNode) node);
-        } else if (node instanceof ModuleNode) {
-            return buildModule((ModuleNode) node);
-        // MultiTargetNode handled a few places internally
-        } else if (node instanceof MultiWriteNode multi) {
-            return buildMultiWriteOrTargetNode(multi.lefts, multi.rest, multi.rights, multi.value);
-        } else if (node instanceof NextNode) {
-            return buildNext((NextNode) node);
-        } else if (node instanceof NilNode) {
-            return nil();
-        // NoKeywordsParameterNode processed by def                       // MISSING: NoKeywordsParameterNode
-        } else if (node instanceof NumberedReferenceReadNode) {
-            return buildNumberedReferenceRead((NumberedReferenceReadNode) node);
-        // OptionalParameterNode processed by def
-        } else if (node instanceof OrNode) {
-            return buildOr((OrNode) node);
-        // ParametersNode processed by def
-        } else if (node instanceof ParenthesesNode) {
-            return build(((ParenthesesNode) node).body);
-        } else if (node instanceof PinnedExpressionNode) {
-            return build(((PinnedExpressionNode) node).expression);
-        } else if (node instanceof PinnedVariableNode) {
-            return build(((PinnedVariableNode) node).variable);
-        } else if (node instanceof PostExecutionNode) {
-            return buildPostExecution((PostExecutionNode) node);
-        } else if (node instanceof PreExecutionNode) {
-            return buildPreExecution((PreExecutionNode) node);
-        } else if (node instanceof ProgramNode) {
-            return buildProgram((ProgramNode) node);
-        } else if (node instanceof RangeNode) {
-            return buildRange((RangeNode) node);
-        } else if (node instanceof RationalNode) {
-            return buildRational((RationalNode) node);
-        } else if (node instanceof RedoNode) {
-            return buildRedo((RedoNode) node);
-        } else if (node instanceof RegularExpressionNode) {
-            return buildRegularExpression((RegularExpressionNode) node);
-        // RequiredDestructuredParamterNode, RequiredParameterNode processed by def
-        } else if (node instanceof RescueModifierNode) {
-            return buildRescueModifier((RescueModifierNode) node);
-        // RescueNode handled by begin
-        // RestParameterNode handled by def
-        } else if (node instanceof RetryNode) {
-            return buildRetry((RetryNode) node);
-        } else if (node instanceof ReturnNode) {
-            return buildReturn((ReturnNode) node);
-        } else if (node instanceof SelfNode) {
-            return buildSelf();
-        } else if (node instanceof ShareableConstantNode) {
-            return buildShareableConstant((ShareableConstantNode) node);
-        } else if (node instanceof SingletonClassNode) {
-            return buildSingletonClass((SingletonClassNode) node);
-        } else if (node instanceof SourceEncodingNode) {
-            return buildSourceEncoding();
-        } else if (node instanceof SourceFileNode) {
-            return buildSourceFile();
-        } else if (node instanceof SourceLineNode) {
-            return buildSourceLine(node);
-        } else if (node instanceof SplatNode) {
-            return buildSplat((SplatNode) node);
-        } else if (node instanceof StatementsNode) {
-            return buildStatements((StatementsNode) node);
-        } else if (node instanceof StringNode) {
-            return buildString((StringNode) node);
-        } else if (node instanceof SuperNode) {
-            return buildSuper(result, (SuperNode) node);
-        } else if (node instanceof SymbolNode) {
-            return buildSymbol((SymbolNode) node);
-        } else if (node instanceof TrueNode) {
-            return tru();
-        } else if (node instanceof UndefNode) {
-            return buildUndef((UndefNode) node);
-        } else if (node instanceof UnlessNode) {
-            return buildUnless(result, (UnlessNode) node);
-        } else if (node instanceof UntilNode) {
-            return buildUntil((UntilNode) node);
-        // WhenNode processed by case
-        } else if (node instanceof WhileNode) {
-            return buildWhile((WhileNode) node);
-        } else if (node instanceof XStringNode) {
-            return buildXString(result, (XStringNode) node);
-        } else if (node instanceof YieldNode) {
-            return buildYield(result, (YieldNode) node);
-        } else {
-            throw new RuntimeException("Unhandled Node type: " + node);
-        }
+        return switch (node) {
+            case AliasGlobalVariableNode n -> buildAliasGlobalVariable(n);
+            case AliasMethodNode n -> buildAliasMethod(n);
+            case AndNode n -> buildAnd(n);
+            case ArrayNode n -> buildArray(n);
+            // MISSING: ArrayPatternNode
+            case AssocSplatNode n -> buildAssocSplat(result, n);
+            case BackReferenceReadNode n -> buildBackReferenceRead(result, n);
+            case BeginNode n -> buildBegin(n);
+            case BlockArgumentNode n -> buildBlockArgument(n);
+            case BlockNode n -> buildBlock(n);
+            // BlockParameterNode processed during call building.
+            case BreakNode n -> buildBreak(n);
+            case CallNode n -> buildCall(result, n, (n).name);
+            case CallAndWriteNode n -> buildCallAndWrite(n);
+            case CallOrWriteNode n -> buildCallOrWrite(n);
+            case CallOperatorWriteNode n -> buildCallOperatorWrite(n);
+            case CaseNode n -> buildCase(n);
+            case CaseMatchNode n -> buildCaseMatch(n);
+            case ClassNode n -> buildClass(n);
+            case ClassVariableAndWriteNode n -> buildClassAndVariableWrite(n);
+            case ClassVariableOperatorWriteNode n -> buildClassVariableOperatorWrite(n);
+            case ClassVariableOrWriteNode n -> buildClassOrVariableWrite(n);
+            case ClassVariableReadNode n -> buildClassVariableRead(result, n);
+            case ClassVariableWriteNode n -> buildClassVariableWrite(n);
+            case ConstantAndWriteNode n -> buildConstantAndWrite(n);
+            case ConstantOperatorWriteNode n -> buildConstantOperatorWrite(n);
+            case ConstantOrWriteNode n -> buildConstantOrWrite(n);
+            case ConstantPathNode n -> buildConstantPath(result, n);
+            case ConstantPathAndWriteNode n -> buildConstantPathAndWrite(n);
+            case ConstantPathOperatorWriteNode n -> buildConstantPathOperatorWrite(n);
+            case ConstantPathOrWriteNode n -> buildConstantPathOrWrite(n);
+            case ConstantPathWriteNode n -> buildConstantWritePath(n);
+            // ConstantPathTargetNode processed in multiple assignment
+            case ConstantReadNode n -> buildConstantRead(result, n);
+            case ConstantWriteNode n -> buildConstantWrite(n);
+            case DefNode n -> buildDef(n);
+            case DefinedNode n -> buildDefined(n);
+            case ElseNode n -> buildElse(n);
+            case EmbeddedVariableNode n -> build(n.variable);
+            // EmbeddedStatementsNode handle in interpolated processing
+            // EnsureNode - covered by BeginNode and DefNode
+            case FalseNode n -> fals();
+            // MISSING: FindPatternNode
+            case FloatNode n -> buildFloat(n);
+            case FlipFlopNode n -> buildFlipFlop(n);
+            case ForNode n -> buildFor(n);
+            // ForwardingArgumentsNode, ForwardingParametersNode process by def and call sides respectively
+            case ForwardingSuperNode n -> buildForwardingSuper(result, n);
+            case GlobalVariableAndWriteNode n -> buildGlobalVariableAndWrite(n);
+            case GlobalVariableOperatorWriteNode n -> buildGlobalVariableOperatorWrite(n);
+            case GlobalVariableOrWriteNode n -> buildGlobalVariableOrWrite(n);
+            case GlobalVariableReadNode n -> buildGlobalVariableRead(result, n);
+            // GlobalVariableTargetNode processed by muliple assignment
+            case GlobalVariableWriteNode n -> buildGlobalVariableWrite(n);
+            case HashNode n -> buildHash(n.elements, containsVariableAssignment(n));
+            case IfNode n -> buildIf(result, n);
+            case ImaginaryNode n -> buildImaginary(n);
+            case ImplicitNode n -> build(n.value);
+            case IndexAndWriteNode n -> buildIndexAndWrite(n);
+            case IndexOrWriteNode n -> buildIndexOrWrite(n);
+            case IndexOperatorWriteNode n -> buildIndexOperatorWrite(n);
+            case InstanceVariableAndWriteNode n -> buildInstanceVariableAndWrite(n);
+            case InstanceVariableOperatorWriteNode n -> buildInstanceVariableOperatorWrite(n);
+            case InstanceVariableOrWriteNode n -> buildInstanceVariableOrWrite(n);
+            case InstanceVariableReadNode n -> buildInstanceVariableRead(n);
+            // InstanceVariableTargetNode processed by multiple assignment
+            case InstanceVariableWriteNode n -> buildInstanceVariableWrite(n);
+            case IntegerNode n -> buildInteger(n);
+            case InterpolatedMatchLastLineNode n -> buildInterpolatedMatchLastLine(result, n);
+            case InterpolatedRegularExpressionNode n -> buildInterpolatedRegularExpression(result, n);
+            case InterpolatedStringNode n -> buildInterpolatedString(result, n);
+            case InterpolatedSymbolNode n -> buildInterpolatedSymbol(result, n);
+            case InterpolatedXStringNode n -> buildInterpolatedXString(result, n);
+            case ItLocalVariableReadNode n -> buildItRead();
+            case KeywordHashNode n -> buildKeywordHash(n, new int[1]); // FIXME: we don't care about flags but this is odd (seems to only be for array syntax with kwrest?).
+            // KeywordParameterNode, KeywordRestParameterNode processed by call
+            case LambdaNode n -> buildLambda(n);
+            case LocalVariableAndWriteNode n -> buildLocalAndVariableWrite(n);
+            case LocalVariableOperatorWriteNode n -> buildLocalVariableOperatorWrite(n);
+            case LocalVariableOrWriteNode n -> buildLocalOrVariableWrite(n);
+            case LocalVariableReadNode n -> buildLocalVariableRead(n);
+            // LocalVariableTargetNode processed by multiple assignment
+            case LocalVariableWriteNode n -> buildLocalVariableWrite(n);
+            case MatchLastLineNode n -> buildMatchLastLine(result, n);
+            case MatchPredicateNode n -> buildMatchPredicate(n);
+            case MatchRequiredNode n -> buildMatchRequired(n);
+            case MatchWriteNode n -> buildMatchWrite(result, n);
+            case MissingNode n -> buildMissing(n);
+            case ModuleNode n -> buildModule(n);
+            // MultiTargetNode handled a few places internally
+            case MultiWriteNode n -> buildMultiWriteOrTargetNode(n.lefts, n.rest, n.rights, n.value);
+            case NextNode n -> buildNext(n);
+            case NilNode n -> nil();
+            // NoKeywordsParameterNode processed by def
+            case NumberedReferenceReadNode n -> buildNumberedReferenceRead(n);
+            // OptionalParameterNode processed by def
+            case OrNode n -> buildOr(n);
+            // ParametersNode processed by def
+            case ParenthesesNode n -> build(n.body);
+            case PinnedExpressionNode n -> build(n.expression);
+            case PinnedVariableNode n -> build(n.variable);
+            case PostExecutionNode n -> buildPostExecution(n);
+            case PreExecutionNode n -> buildPreExecution(n);
+            case ProgramNode n -> buildProgram(n);
+            case RangeNode n -> buildRange(n);
+            case RationalNode n -> buildRational(n);
+            case RedoNode n -> buildRedo(n);
+            case RegularExpressionNode n -> buildRegularExpression(n);
+            // RequiredDestructuredParamterNode, RequiredParameterNode processed by def
+            case RescueModifierNode n -> buildRescueModifier(n);
+            // RescueNode handled by begin
+            // RestParameterNode handled by def
+            case RetryNode n -> buildRetry(n);
+            case ReturnNode n -> buildReturn(n);
+            case SelfNode n -> buildSelf();
+            case ShareableConstantNode n -> buildShareableConstant(n);
+            case SingletonClassNode n -> buildSingletonClass(n);
+            case SourceEncodingNode n -> buildSourceEncoding();
+            case SourceFileNode n -> buildSourceFile();
+            case SourceLineNode n -> buildSourceLine(node);
+            case SplatNode n -> buildSplat(n);
+            case StatementsNode n -> buildStatements(n);
+            case StringNode n -> buildString(n);
+            case SuperNode n -> buildSuper(result, n);
+            case SymbolNode n -> buildSymbol(n);
+            case TrueNode n -> tru();
+            case UndefNode n -> buildUndef(n);
+            case UnlessNode n -> buildUnless(result, n);
+            case UntilNode n -> buildUntil(n);
+            // WhenNode processed by case
+            case WhileNode n -> buildWhile(n);
+            case XStringNode n -> buildXString(result, n);
+            case YieldNode n -> buildYield(result, n);
+            default -> throw new RuntimeException("Unhandled Node type: " + node);
+        };
     }
 
     private Operand buildCallOperatorWrite(CallOperatorWriteNode node) {
