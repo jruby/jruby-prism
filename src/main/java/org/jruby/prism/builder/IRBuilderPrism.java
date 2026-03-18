@@ -1885,9 +1885,15 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         boolean containsVariableAssignment = containsVariableAssignment(keywordArgs);
 
         if (pairs.length == 1) { // Only a single rest arg here.  Do not bother to merge.
-            Operand splat = buildWithOrder(((AssocSplatNode) pairs[0]).value, containsVariableAssignment);
+            var pair = (AssocSplatNode) pairs[0];
 
-            return addResultInstr(new RuntimeHelperCall(temp(), HASH_CHECK, new Operand[] { splat }));
+            if (pair.value == null) {
+                return scope.lookupExistingLVar(symbol("**"));
+            } else {
+                Operand splat = buildWithOrder(pair.value, containsVariableAssignment);
+
+                return addResultInstr(new RuntimeHelperCall(temp(), HASH_CHECK, new Operand[]{splat}));
+            }
         }
 
         Variable splatValue = copy(new Hash(new ArrayList<>()));
