@@ -5,6 +5,7 @@ import org.jcodings.specific.ISO8859_1Encoding;
 import org.jruby.ParseResult;
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
+import org.jruby.RubyFile;
 import org.jruby.RubyIO;
 import org.jruby.RubyInstanceConfig;
 import org.jruby.RubySymbol;
@@ -20,6 +21,7 @@ import org.jruby.runtime.load.LoadServiceResourceInputStream;
 import org.jruby.util.ByteList;
 import org.jruby.util.CommonByteLists;
 import org.jruby.util.io.ChannelHelper;
+import org.jruby.util.io.SeekableByteChannelImpl;
 import org.ruby_lang.prism.Nodes.ArgumentsNode;
 import org.ruby_lang.prism.Nodes.CallNode;
 import org.ruby_lang.prism.Nodes.CallNodeFlags;
@@ -35,6 +37,7 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.channels.SeekableByteChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -95,11 +98,9 @@ public abstract class ParserPrismBase extends Parser {
         }
 
         if (type == MAIN && res.dataLocation != null) {
-            // FIXME: Intentionally leaving as original source for offset.  This can just be an IO where pos is set to right value.
-            // FIXME: Somehow spec will say this should File and not IO but I cannot figure out why legacy parser isn't IO also.
             ByteArrayInputStream bais = new ByteArrayInputStream(source, 0, source.length);
             bais.skip(res.dataLocation.startOffset + 8); // FIXME: 8 is for including __END__\n
-            runtime.defineDATA(RubyIO.newIO(runtime, ChannelHelper.readableChannel(bais)));
+            runtime.defineDATA(RubyFile.DATAFile(runtime, fileName, new SeekableByteChannelImpl(bais)));
         }
 
         int lineCount = res.source.getLineCount();
