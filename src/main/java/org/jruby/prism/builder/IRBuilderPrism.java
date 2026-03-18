@@ -375,8 +375,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     protected void buildAssignment(Node node, Operand rhsVal) {
         if (node == null) return; // case of 'a, = something'
 
-        if (node instanceof CallTargetNode) {
-            buildAttrAssignAssignment(((CallTargetNode) node).receiver, ((CallTargetNode) node).name, Node.EMPTY_ARRAY, rhsVal);
+        if (node instanceof CallTargetNode call) {
+            buildCallTarget(call, build(call.receiver), rhsVal);
         } else if (node instanceof IndexTargetNode) {
             Node[] arguments = ((IndexTargetNode) node).arguments == null ? Node.EMPTY_ARRAY : ((IndexTargetNode) node).arguments.arguments;
             buildAttrAssignAssignment(((IndexTargetNode) node).receiver, symbol("[]="), arguments, rhsVal);
@@ -414,6 +414,16 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             buildSplat(rhsVal);
         } else {
             throw notCompilable("Can't build assignment node", node);
+        }
+    }
+
+    private void buildCallTarget(CallTargetNode call, Operand receiver, Operand rhsVal) {
+        CallType callType = call.isIgnoreVisibility() ? CallType.FUNCTIONAL : CallType.NORMAL;
+        if (call.isSafeNavigation()) {
+            if_not(receiver, nil(),
+                    () -> _call(temp(), callType, receiver, call.name, rhsVal));
+        } else {
+            _call(temp(), callType, receiver, call.name, rhsVal);
         }
     }
 
@@ -1561,16 +1571,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             var rhs = assign.b.getResult();
 
             switch (node) {
-                case CallTargetNode call -> {
-                    CallType callType = call.isIgnoreVisibility() ? CallType.FUNCTIONAL : CallType.NORMAL;
-                    var receiver = reads.get(call.receiver);
-                    if (call.isSafeNavigation()) {
-                        if_not(receiver, nil(),
-                                () -> _call(temp(), callType, receiver, call.name, rhs));
-                    } else {
-                        _call(temp(), callType, receiver, call.name, rhs);
-                    }
-                }
+                case CallTargetNode call -> buildCallTarget(call, reads.get(call.receiver), rhs);
                 case IndexTargetNode index -> {
                     // FIXME: we determine self.foo[] by requiring receiver to be `self` in AttrAssignInstr but we could
                     //  use isIgnoreVisibility() that the parser provides.  We have no code path to do this though in AttrAssignInstr.
@@ -2182,15 +2183,9 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             Variable v = temp();
             addInstr(new ReceivePreReqdArgInstr(v, keywords, argIndex));
             addInstr(new PutGlobalVarInstr(target.name, v));
-        } else if (node instanceof CallTargetNode target) {
+        } else if (node instanceof CallTargetNode call) {
             var v = addResultInstr(new ReceivePreReqdArgInstr(temp(), keywords, argIndex));
-            if (target.isSafeNavigation()) {
-                var receiver = build(target.receiver);
-                if_not(receiver, nil(),
-                        () -> call(temp(), receiver, target.name, v));
-            } else {
-                call(temp(), build(target.receiver), target.name, v);
-            }
+            buildCallTarget(call, build(call.receiver), v);
         } else if (node instanceof IndexTargetNode target) {
             var v = addResultInstr(new ReceivePreReqdArgInstr(temp(), keywords, argIndex));
             if (target.isSafeNavigation()) {
