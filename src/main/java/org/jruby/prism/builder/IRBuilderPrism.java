@@ -687,9 +687,13 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         for (int i = 0; i < numberOfArgs; i++) {
             Node child = children[i];
 
-            if (child instanceof SplatNode) {
-                flags[0] |= CALL_SPLATS;
-                builtArgs[i] = new Splat(addResultInstr(new BuildSplatInstr(temp(), build(((SplatNode) child).expression), true)));
+            if (child instanceof SplatNode splat) {
+                if (splat.expression != null) {
+                    flags[0] |= CALL_SPLATS;
+                    builtArgs[i] = new Splat(addResultInstr(new BuildSplatInstr(temp(), build(splat), true)));
+                } else {
+                    builtArgs[i] = new Splat(scope.lookupExistingLVar(symbol("*")));
+                }
             } else if (child instanceof KeywordHashNode && i == numberOfArgs - 1) {
                 builtArgs[i] = buildCallKeywordArguments((KeywordHashNode) children[i], flags); // FIXME: here and possibly AST make isKeywordsHash() method.
             } else if (child instanceof ForwardingArgumentsNode) {
