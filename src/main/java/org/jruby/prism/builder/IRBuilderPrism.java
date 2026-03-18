@@ -467,9 +467,21 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
     private Operand buildBlock(BlockNode node) {
         StaticScope staticScope = createStaticScopeFrom(node.locals, StaticScope.Type.BLOCK);
+        markImplicitVariables(staticScope, node.locals, node.parameters);
         Signature signature = calculateSignature(node.parameters);
         staticScope.setSignature(signature);
         return buildIter(node.parameters, node.body, staticScope, signature, getLine(node), getEndLine(node));
+    }
+
+    private void markImplicitVariables(StaticScope staticScope, RubySymbol[] locals, Node parameters) {
+        if (parameters instanceof NumberedParametersNode num) markImplcitNums(staticScope, num.maximum);
+    }
+
+    private void markImplcitNums(StaticScope staticScope, int maximum) {
+        for (int i = 0; i < maximum; i++) {
+            int slot = staticScope.existsOrImplicit("_" + (i + 1));
+            staticScope.markImplicitVariable(slot & 0xffff);
+        }
     }
 
     protected Variable receiveBlockArg(Variable v, Operand argsArray, int argIndex, boolean isSplat) {
@@ -1480,6 +1492,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
     private Operand buildLambda(LambdaNode node) {
         StaticScope staticScope = createStaticScopeFrom(node.locals, StaticScope.Type.BLOCK);
+        markImplicitVariables(staticScope, node.locals, node.parameters);
         Signature signature = calculateSignature(node.parameters);
         staticScope.setSignature(signature);
         return buildLambda(node.parameters, node.body, staticScope, signature, getLine(node));
