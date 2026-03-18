@@ -848,7 +848,17 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildConstantPathOperatorWrite(ConstantPathOperatorWriteNode node) {
-        return buildOpAsgnConstDecl(node.target, node.value, node.binary_operator);
+        var path = node.target;
+
+        if (path.parent == null) {
+            return buildOpAsgnConstDecl(node.target, node.value, node.binary_operator);
+        } else {
+            Operand parent = build(path.parent);
+            Operand lhs = searchModuleForConst(temp(), parent, path.name);
+            Operand rhs = build(node.value);
+            Variable result = call(temp(), lhs, node.binary_operator, rhs);
+            return copy(temp(), putConstant(parent, path.name, result));
+        }
     }
 
     private Operand buildConstantPathOrWrite(ConstantPathOrWriteNode node) {
