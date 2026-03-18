@@ -320,13 +320,17 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         for (int i = 0; i < children.length; i++) {
             Node child = children[i];
 
-            if (child instanceof SplatNode) {
+            if (child instanceof SplatNode splat) {
                 int length = i - splatIndex - 1;
 
                 if (length == 0) {
                     // FIXME: This is wasteful to force this all through argscat+empty array
                     if (splatIndex == -1) copy(result, new Array());
-                    addResultInstr(new BuildCompoundArrayInstr(result, result, build(((SplatNode) child).expression), false, false));
+                    if (splat.expression instanceof NilNode) {
+                        copy(result, new Array());
+                    } else {
+                        addResultInstr(new BuildCompoundArrayInstr(result, result, build(splat.expression), false, false));
+                    }
                 } else {
                     Operand[] lhs = new Operand[length];
                     System.arraycopy(elts, splatIndex + 1, lhs, 0, length);
@@ -338,7 +342,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                         addResultInstr(new BuildCompoundArrayInstr(result, result, new Array(lhs), false, false));
                     }
 
-                    addResultInstr(new BuildCompoundArrayInstr(result, result, build(((SplatNode) child).expression), false, false));
+                    addResultInstr(new BuildCompoundArrayInstr(result, result, build(splat.expression), false, false));
                 }
                 splatIndex = i;
             } else if (child instanceof KeywordHashNode) {
