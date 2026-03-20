@@ -6,7 +6,6 @@ import org.jruby.ParseResult;
 import org.jruby.Ruby;
 import org.jruby.RubyArray;
 import org.jruby.RubyFile;
-import org.jruby.RubyIO;
 import org.jruby.RubyInstanceConfig;
 import org.jruby.RubySymbol;
 import org.jruby.ext.coverage.CoverageData;
@@ -19,34 +18,21 @@ import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.builtin.IRubyObject;
 import org.jruby.runtime.load.LoadServiceResourceInputStream;
 import org.jruby.util.ByteList;
-import org.jruby.util.CommonByteLists;
-import org.jruby.util.io.ChannelHelper;
 import org.jruby.util.io.SeekableByteChannelImpl;
-import org.ruby_lang.prism.Nodes.ArgumentsNode;
-import org.ruby_lang.prism.Nodes.CallNode;
-import org.ruby_lang.prism.Nodes.CallNodeFlags;
-import org.ruby_lang.prism.Nodes.GlobalVariableReadNode;
-import org.ruby_lang.prism.Nodes.GlobalVariableWriteNode;
-import org.ruby_lang.prism.Nodes.Node;
 import org.ruby_lang.prism.Nodes.ProgramNode;
-import org.ruby_lang.prism.Nodes.StatementsNode;
-import org.ruby_lang.prism.Nodes.WhileNode;
 import org.ruby_lang.prism.ParsingOptions;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.channels.SeekableByteChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
-import java.util.List;
 import java.util.stream.IntStream;
 
-import static org.jruby.api.Convert.asSymbol;
-import static org.jruby.lexer.LexingCommon.DOLLAR_UNDERSCORE;
 import static org.jruby.parser.ParserType.EVAL;
+import static org.jruby.parser.ParserType.INLINE;
 import static org.jruby.parser.ParserType.MAIN;
 
 public abstract class ParserPrismBase extends Parser {
@@ -62,7 +48,7 @@ public abstract class ParserPrismBase extends Parser {
     public ParseResult parse(String fileName, int lineNumber, ByteList content, DynamicScope existingScope, ParserType type) {
         int sourceLength = content.realSize();
         byte[] source = content.begin() == 0 ? content.unsafeBytes() : content.bytes();
-        byte[] metadata = generateMetadata(fileName, lineNumber, content.getEncoding(), existingScope);
+        byte[] metadata = generateMetadata(fileName, lineNumber, content.getEncoding(), existingScope, type);
         byte[] serialized = parse(source, sourceLength, metadata);
         return parseInternal(fileName, existingScope, source, serialized, type);
     }
@@ -155,7 +141,7 @@ public abstract class ParserPrismBase extends Parser {
     protected ParseResult parse(String fileName, int lineNumber, InputStream in, Encoding encoding,
                       DynamicScope existingScope, ParserType type) {
         byte[] source = getSourceAsBytes(fileName, in);
-        byte[] metadata = generateMetadata(fileName, lineNumber, encoding, existingScope);
+        byte[] metadata = generateMetadata(fileName, lineNumber, encoding, existingScope, type);
         byte[] serialized = parse(source, source.length, metadata);
         return parseInternal(fileName, existingScope, source, serialized, type);
     }
@@ -182,13 +168,13 @@ public abstract class ParserPrismBase extends Parser {
     }
 
     // lineNumber (0-indexed)
-    private byte[] generateMetadata(String fileName, int lineNumber, Encoding encoding, DynamicScope scope) {
+    private byte[] generateMetadata(String fileName, int lineNumber, Encoding encoding, DynamicScope scope, ParserType type) {
         return ParsingOptions.serialize(
                 fileName.getBytes(),
                 lineNumber + 1,
                 encoding.getName(),
                 (runtime.getInstanceConfig().isFrozenStringLiteral() instanceof Boolean bool && bool),
-                commandLineFromConfig(runtime.getInstanceConfig()),
+                commandLineFromConfig(runtime.getInstanceConfig(), type == MAIN || type == INLINE),
                 ParsingOptions.SyntaxVersion.V4_0,
                 false,
                 true,
@@ -222,15 +208,17 @@ public abstract class ParserPrismBase extends Parser {
                         .toArray(ParsingOptions.Forwarding[]::new)));
     }
 
-    private EnumSet<ParsingOptions.CommandLine> commandLineFromConfig(RubyInstanceConfig config) {
+    private EnumSet<ParsingOptions.CommandLine> commandLineFromConfig(RubyInstanceConfig config, boolean isMain) {
         var list = new ArrayList<ParsingOptions.CommandLine>();
-        
-        if (config.isSplit()) list.add(ParsingOptions.CommandLine.A); // -a
-        if (config.isInlineScript()) list.add(ParsingOptions.CommandLine.E);    // -e
-        if (config.isProcessLineEnds()) list.add(ParsingOptions.CommandLine.L); // -l
-        if (config.isAssumeLoop()) list.add(ParsingOptions.CommandLine.N);      // -n
-        if (config.isAssumePrinting()) list.add(ParsingOptions.CommandLine.P); // -p
-        if (config.isXFlag()) list.add(ParsingOptions.CommandLine.X);          // -x
+
+        if (isMain) {
+            if (config.isSplit()) list.add(ParsingOptions.CommandLine.A); // -a
+            if (config.isInlineScript()) list.add(ParsingOptions.CommandLine.E);    // -e
+            if (config.isProcessLineEnds()) list.add(ParsingOptions.CommandLine.L); // -l
+            if (config.isAssumeLoop()) list.add(ParsingOptions.CommandLine.N);      // -n
+            if (config.isAssumePrinting()) list.add(ParsingOptions.CommandLine.P); // -p
+            if (config.isXFlag()) list.add(ParsingOptions.CommandLine.X);          // -x
+        }
 
         return list.isEmpty() ? EnumSet.noneOf(ParsingOptions.CommandLine.class) : EnumSet.copyOf(list);
     }
@@ -305,50 +293,9 @@ public abstract class ParserPrismBase extends Parser {
         return lineStubs;
     }
 
-    // It looks weird to see 0 everywhere but these are all virtual instrs and if they raise during execution it will
-    // show it happening on line 1 (which is what it should do).
+    // Prism generates this for us.
     @Override
     public ParseResult addGetsLoop(Ruby runtime, ParseResult result, boolean printing, boolean processLineEndings, boolean split) {
-        var context = runtime.getCurrentContext();
-        List<Node> newBody = new ArrayList<>();
-
-        if (processLineEndings) {
-            newBody.add(new GlobalVariableWriteNode(0, 0, asSymbol(context, CommonByteLists.DOLLAR_BACKSLASH),
-                    new GlobalVariableReadNode(0, 0, asSymbol(context, CommonByteLists.DOLLAR_SLASH))));
-        }
-
-        GlobalVariableReadNode dollarUnderscore = new GlobalVariableReadNode(0, 0, asSymbol(context, DOLLAR_UNDERSCORE));
-
-        List<Node> whileBody = new ArrayList<>();
-
-        if (processLineEndings) {
-            whileBody.add(new CallNode(0, 0, (short) 0, dollarUnderscore, asSymbol(context, "chomp!"), null, null));
-        }
-        if (split) {
-            whileBody.add(new GlobalVariableWriteNode(0, 0, asSymbol(context, "$F"),
-                    new CallNode(0, 0, (short) 0, dollarUnderscore, asSymbol(context, "split"), null, null)));
-        }
-
-        StatementsNode stmts = ((ProgramNode) result.getAST()).statements;
-        if (stmts != null && stmts.body != null) whileBody.addAll(Arrays.asList(stmts.body));
-
-        ArgumentsNode args = new ArgumentsNode(0, 0, (short) 0, new Node[] { dollarUnderscore });
-        if (printing) whileBody.add(new CallNode(0, 0, (short) 0, null, asSymbol(context, "print"), args, null));
-
-        Node[] nodes = new Node[whileBody.size()];
-        whileBody.toArray(nodes);
-        StatementsNode statements = new StatementsNode(0, 0, nodes);
-
-        newBody.add(new WhileNode(0, 0, (short) 0,
-                new CallNode(0, 0, CallNodeFlags.VARIABLE_CALL, null, asSymbol(context, "gets"), null, null),
-                statements));
-
-        nodes = new Node[newBody.size()];
-        newBody.toArray(nodes);
-        ProgramNode newRoot = new ProgramNode(0, 0, new RubySymbol[] {}, new StatementsNode(0, 0, nodes));
-
-        ((ParseResultPrism) result).setRoot(newRoot);
-
         return result;
     }
 }
