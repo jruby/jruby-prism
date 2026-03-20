@@ -24,11 +24,13 @@ import org.jruby.ir.IRScriptBody;
 import org.jruby.ir.Tuple;
 import org.jruby.ir.builder.IRBuilder;
 import org.jruby.ir.builder.LazyMethodDefinition;
+import org.jruby.ir.builder.StringStyle;
 import org.jruby.ir.instructions.*;
 import org.jruby.ir.instructions.defined.GetErrorInfoInstr;
 import org.jruby.ir.instructions.defined.RestoreErrorInfoInstr;
 import org.jruby.ir.operands.Array;
 import org.jruby.ir.operands.Bignum;
+import org.jruby.ir.operands.ChilledString;
 import org.jruby.ir.operands.Complex;
 import org.jruby.ir.operands.CurrentScope;
 import org.jruby.ir.operands.Fixnum;
@@ -1435,7 +1437,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildInterpolatedString(Variable result, InterpolatedStringNode node) {
-        return buildDStr(result, node.parts, getEncoding(), false, getLine(node));
+        return buildDStr(result, node.parts, getEncoding(), StringStyle.Chilled, getLine(node));
     }
 
     private Operand buildInterpolatedSymbol(Variable result, InterpolatedSymbolNode node) {
@@ -1954,11 +1956,10 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildString(StringNode node) {
-        if (node.isFrozen()) {
-            return new FrozenString(bytelistFrom(node), CR_UNKNOWN, scope.getFile(), getLine(node));
-        } else {
-            return copy(temp(), new MutableString(bytelistFrom(node), CR_UNKNOWN, scope.getFile(), getLine(node)));
-        }
+        if (node.isMutable()) return copy(temp(), new MutableString(bytelistFrom(node), CR_UNKNOWN, scope.getFile(), getLine(node)));
+        if (node.isFrozen()) return new FrozenString(bytelistFrom(node), CR_UNKNOWN, scope.getFile(), getLine(node));
+
+        return new ChilledString(bytelistFrom(node), CR_UNKNOWN, scope.getFile(), getLine(node));
     }
 
     private Operand buildFrozenString(StringNode node) {
