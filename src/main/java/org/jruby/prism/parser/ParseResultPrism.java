@@ -51,6 +51,7 @@ public class ParseResultPrism implements ParseResult {
     public StaticScope getStaticScope() {
         if (rootScope == null) {
             rootScope = IRBuilderPrism.createStaticScopeFrom(fileName, symbols(root.locals), StaticScope.Type.LOCAL, null);
+            rootScope.setModule(runtime.getObject());
             toplevelScope = DynamicScope.newDynamicScope(rootScope);
         }
 
