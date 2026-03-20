@@ -533,9 +533,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     public void receiveBlockArgs(Node node) {
         if (node == null) return;
 
-        if (node instanceof NumberedParametersNode) {
-            NumberedParametersNode params = (NumberedParametersNode) node;
-            ((IRClosure) scope).setArgumentDescriptors(parametersToArgumentDescriptors((NumberedParametersNode) node));
+        if (node instanceof NumberedParametersNode params) {
+            ((IRClosure) scope).setArgumentDescriptors(parametersToArgumentDescriptors(params));
             Variable keywords = addResultInstr(new ReceiveKeywordsInstr(temp(), true, true));
 
             for (int i = 0; i < params.maximum; i++) {
@@ -547,34 +546,31 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             Variable keywords = addResultInstr(new ReceiveKeywordsInstr(temp(), true, true));
             Variable v = getLocalVariable(symbol("it"), 0);
             addInstr(new ReceivePreReqdArgInstr(v, keywords, 0));
-        } else {
+        } else if (node instanceof BlockParametersNode params) {
             // FIXME: Missing locals?  Not sure how we handle those but I would have thought with a scope?
-            buildParameters(((BlockParametersNode) node).parameters);
-
+            buildParameters(params.parameters);
             ((IRClosure) scope).setArgumentDescriptors(createArgumentDescriptor());
+        } else {
+            throw notCompilable("missing arg processing for blocks", node);
         }
     }
 
     private void buildBlockArgsAssignment(Node node, Operand argsArray, int argIndex, boolean isSplat) {
-        if (node instanceof CallNode) { // attribute assignment: a[0], b = 1, 2
-            buildAttrAssignAssignment(((CallNode) node).receiver, ((CallNode) node).name, ((CallNode) node).arguments.arguments,
+        if (node instanceof CallNode call) { // attribute assignment: a[0], b = 1, 2
+            buildAttrAssignAssignment(call.receiver, call.name, call.arguments.arguments,
                     receiveBlockArg(temp(), argsArray, argIndex, isSplat));
-        } else if (node instanceof LocalVariableTargetNode) {
-            LocalVariableTargetNode lvar = (LocalVariableTargetNode) node;
+        } else if (node instanceof LocalVariableTargetNode lvar) {
             receiveBlockArg(getLocalVariable(lvar.name, lvar.depth), argsArray, argIndex, isSplat);
-        } else if (node instanceof ClassVariableTargetNode) {
-            addInstr(new PutClassVariableInstr(classVarDefinitionContainer(), ((ClassVariableTargetNode) node).name,
+        } else if (node instanceof ClassVariableTargetNode cvar) {
+            addInstr(new PutClassVariableInstr(classVarDefinitionContainer(), cvar.name,
                     receiveBlockArg(temp(), argsArray, argIndex, isSplat)));
-        } else if (node instanceof ConstantTargetNode) {
-            putConstant(((ConstantTargetNode) node).name, receiveBlockArg(temp(), argsArray, argIndex, isSplat));
-        } else if (node instanceof GlobalVariableTargetNode) {
-            addInstr(new PutGlobalVarInstr(((GlobalVariableTargetNode) node).name,
-                    receiveBlockArg(temp(), argsArray, argIndex, isSplat)));
-        } else if (node instanceof InstanceVariableTargetNode) {
-            addInstr(new PutFieldInstr(buildSelf(), ((InstanceVariableTargetNode) node).name,
-                    receiveBlockArg(temp(), argsArray, argIndex, isSplat)));
-        } else if (node instanceof MultiTargetNode) {
-            MultiTargetNode multi = (MultiTargetNode) node;
+        } else if (node instanceof ConstantTargetNode constant) {
+            putConstant(constant.name, receiveBlockArg(temp(), argsArray, argIndex, isSplat));
+        } else if (node instanceof GlobalVariableTargetNode gvar) {
+            addInstr(new PutGlobalVarInstr(gvar.name, receiveBlockArg(temp(), argsArray, argIndex, isSplat)));
+        } else if (node instanceof InstanceVariableTargetNode ivar) {
+            addInstr(new PutFieldInstr(buildSelf(), ivar.name, receiveBlockArg(temp(), argsArray, argIndex, isSplat)));
+        } else if (node instanceof MultiTargetNode multi) {
             for (int i = 0; i < multi.lefts.length; i++) {
                 buildBlockArgsAssignment(multi.lefts[i], null, i, false);
             }
@@ -596,8 +592,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Operand buildBlockArgument(BlockArgumentNode node) {
-        if (node.expression instanceof SymbolNode && !scope.maybeUsingRefinements()) {
-            return new SymbolProc(symbol(((SymbolNode) node.expression)));
+        if (node.expression instanceof SymbolNode sym && !scope.maybeUsingRefinements()) {
+            return new SymbolProc(symbol(sym));
         } else if (node.expression == null) {
             return getYieldClosureVariable();
         }
@@ -631,8 +627,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
         if (callType != CallType.FUNCTIONAL && Options.IR_STRING_FREEZE.load()) {
             // Frozen string optimization: check for "string".freeze
-            if (node.receiver instanceof StringNode && (id.equals("freeze") || id.equals("-@"))) {
-                return new FrozenString(bytelistFrom((StringNode) node.receiver), CR_UNKNOWN, scope.getFile(), getLine(node.receiver));
+            if (node.receiver instanceof StringNode receiver && (id.equals("freeze") || id.equals("-@"))) {
+                return new FrozenString(bytelistFrom(receiver), CR_UNKNOWN, scope.getFile(), getLine(receiver));
             }
         }
 
@@ -652,8 +648,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         Operand receiver;
         if (callType == CallType.FUNCTIONAL) {
             receiver = buildSelf();
-        } else if (node.receiver instanceof CallNode && ((CallNode) node.receiver).isSafeNavigation()) {
-            receiver = buildLazyWithOrder((CallNode) node.receiver, lazyLabel, endLabel, preserveOrder);
+        } else if (node.receiver instanceof CallNode recv && recv.isSafeNavigation()) {
+            receiver = buildLazyWithOrder(recv, lazyLabel, endLabel, preserveOrder);
         } else {
             receiver = buildWithOrder(node.receiver, preserveOrder);
         }
@@ -707,8 +703,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                 } else {
                     builtArgs[i] = new Splat(scope.lookupExistingLVar(symbol("*")));
                 }
-            } else if (child instanceof KeywordHashNode && i == numberOfArgs - 1) {
-                builtArgs[i] = buildCallKeywordArguments((KeywordHashNode) children[i], flags); // FIXME: here and possibly AST make isKeywordsHash() method.
+            } else if (child instanceof KeywordHashNode hash && i == numberOfArgs - 1) {
+                builtArgs[i] = buildCallKeywordArguments(hash, flags); // FIXME: here and possibly AST make isKeywordsHash() method.
             } else if (child instanceof ForwardingArgumentsNode) {
                 Operand rest = buildSplat(getLocalVariable(symbol(FWD_REST), scope.getStaticScope().isDefined("*")));
                 Operand kwRest = getLocalVariable(symbol(FWD_KWREST), scope.getStaticScope().isDefined("**"));
@@ -964,13 +960,9 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     // FIXME: implementation of @@a ||= 1 uses getDefinition to determine it is defined but defined?(@@a ||= 1) is
     // always defined as "assignment".
     protected Operand buildGetDefinition2(Node node) {
-        if (node instanceof ClassVariableOrWriteNode) {
-            return buildClassVarGetDefinition(((ClassVariableOrWriteNode) node).name);
-        } else if (node instanceof GlobalVariableOrWriteNode) {
-            return buildGlobalVarGetDefinition(((GlobalVariableOrWriteNode) node).name);
-        } else if (node instanceof ConstantOrWriteNode) {
-            return buildConstantGetDefinition(((ConstantOrWriteNode) node).name);
-        }
+        if (node instanceof ClassVariableOrWriteNode cvar) return buildClassVarGetDefinition(cvar.name);
+        if (node instanceof GlobalVariableOrWriteNode gvar) return buildGlobalVarGetDefinition(gvar.name);
+        if (node instanceof ConstantOrWriteNode constant) return buildConstantGetDefinition(constant.name);
 
         return buildGetDefinition(node);
     }
@@ -1001,9 +993,9 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         } else if (node instanceof OrNode || node instanceof AndNode ||
                 node instanceof InterpolatedRegularExpressionNode || node instanceof InterpolatedStringNode) {
             return new FrozenString(DefinedMessage.EXPRESSION.getText());
-        } else if (node instanceof ParenthesesNode) {
-            if (((ParenthesesNode) node).body instanceof StatementsNode) {
-                StatementsNode statements = (StatementsNode) ((ParenthesesNode) node).body;
+        } else if (node instanceof ParenthesesNode parens) {
+            if (parens.body instanceof StatementsNode body) {
+                StatementsNode statements = body;
                 switch (statements.body.length) {
                     case 0: return nil();
                     case 1: return buildGetDefinition(statements.body[0]);
@@ -1023,8 +1015,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             return new FrozenString(DefinedMessage.SELF.getText());
         } else if (node instanceof TrueNode) {
             return new FrozenString(DefinedMessage.TRUE.getText());
-        } else if (node instanceof StatementsNode) {
-            Node[] array = ((StatementsNode) node).body;
+        } else if (node instanceof StatementsNode stmts) {
+            Node[] array = stmts.body;
             Label undefLabel = getNewLabel();
             Label doneLabel = getNewLabel();
 
@@ -1042,8 +1034,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             addInstr(new LabelInstr(doneLabel));
 
             return tmpVar;
-        } else if (node instanceof GlobalVariableReadNode) {
-            return buildGlobalVarGetDefinition(((GlobalVariableReadNode) node).name);
+        } else if (node instanceof GlobalVariableReadNode gvar) {
+            return buildGlobalVarGetDefinition(gvar.name);
         } else if (node instanceof BackReferenceReadNode) {
             return addResultInstr(
                     new RuntimeHelperCall(
@@ -1052,22 +1044,22 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                             new Operand[] {new FrozenString(DefinedMessage.GLOBAL_VARIABLE.getText())}
                     )
             );
-        } else if (node instanceof NumberedReferenceReadNode) {
+        } else if (node instanceof NumberedReferenceReadNode numparam) {
             return addResultInstr(new RuntimeHelperCall(
                     temp(),
                     IS_DEFINED_NTH_REF,
                     new Operand[] {
-                            fix(((NumberedReferenceReadNode) node).number),
+                            fix(numparam.number),
                             new FrozenString(DefinedMessage.GLOBAL_VARIABLE.getText())
                     }
             ));
-        } else if (node instanceof InstanceVariableReadNode) {
-            return buildInstVarGetDefinition(((InstanceVariableReadNode) node).name);
-        } else if (node instanceof InstanceVariableOrWriteNode) {
-            return buildInstVarGetDefinition(((InstanceVariableOrWriteNode) node).name);
-        } else if (node instanceof ClassVariableReadNode) {
-            return buildClassVarGetDefinition(((ClassVariableReadNode) node).name);
-        } else if (node instanceof SuperNode) {
+        } else if (node instanceof InstanceVariableReadNode ivar) {
+            return buildInstVarGetDefinition(ivar.name);
+        } else if (node instanceof InstanceVariableOrWriteNode ivar) {
+            return buildInstVarGetDefinition(ivar.name);
+        } else if (node instanceof ClassVariableReadNode cvar) {
+            return buildClassVarGetDefinition(cvar.name);
+        } else if (node instanceof SuperNode zuper) {
             Label undefLabel = getNewLabel();
             Variable tmpVar = addResultInstr(
                     new RuntimeHelperCall(
@@ -1080,15 +1072,13 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                     )
             );
             addInstr(createBranch(tmpVar, nil(), undefLabel));
-            Operand superDefnVal = buildGetArgumentDefinition(((SuperNode) node).arguments, DefinedMessage.SUPER.getText());
+            Operand superDefnVal = buildGetArgumentDefinition(zuper.arguments, DefinedMessage.SUPER.getText());
             return buildDefnCheckIfThenPaths(undefLabel, superDefnVal);
         } else if (node instanceof ForwardingSuperNode) {
             return addResultInstr(
                     new RuntimeHelperCall(temp(), IS_DEFINED_SUPER,
                             new Operand[] { buildSelf(), new FrozenString(DefinedMessage.SUPER.getText()) }));
-        } else if (node instanceof CallNode) {
-            CallNode call = (CallNode) node;
-
+        } else if (node instanceof CallNode call) {
             if (call.receiver == null && call.arguments == null) { // VCALL
                 return addResultInstr(
                         new RuntimeHelperCall(temp(), IS_DEFINED_METHOD,
@@ -1118,7 +1108,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                         )
                 );
                 addInstr(createBranch(tmpVar, nil(), undefLabel));
-                Operand argsCheckDefn = buildGetArgumentDefinition(((CallNode) node).arguments, type);
+                Operand argsCheckDefn = buildGetArgumentDefinition(call.arguments, type);
                 return buildDefnCheckIfThenPaths(undefLabel, argsCheckDefn);
             } else { // CALL
                 // protected main block
@@ -1148,15 +1138,13 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             return addResultInstr(
                     new RuntimeHelperCall(temp(), IS_DEFINED_SUPER,
                             new Operand[]{buildSelf(), new FrozenString(DefinedMessage.SUPER.getText())}));
-        } else if (node instanceof ConstantReadNode) {
-            return buildConstantGetDefinition(((ConstantReadNode) node).name);
-        } else if (node instanceof ConstantPathNode) {
+        } else if (node instanceof ConstantReadNode constant) {
+            return buildConstantGetDefinition(constant.name);
+        } else if (node instanceof ConstantPathNode path) {
             // SSS FIXME: Is there a reason to do this all with low-level IR?
             // Can't this all be folded into a Java method that would be part
             // of the runtime library, which then can be used by buildDefinitionCheck method above?
             // This runtime library would be used both by the interpreter & the compiled code!
-
-            ConstantPathNode path = (ConstantPathNode) node;
 
             final RubySymbol name = path.name;
             final Variable errInfo = temp();
@@ -1211,8 +1199,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                 addInstr(new RestoreErrorInfoInstr(errInfo)); // ignore and restore (we don't care about error)
                 return nil();
             });
-        } else if (node instanceof ArrayNode) {
-            ArrayNode array = (ArrayNode) node;
+        } else if (node instanceof ArrayNode array) {
             Label undefLabel = getNewLabel();
             Label doneLabel = getNewLabel();
 
@@ -1273,28 +1260,28 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         for (Node pair: elements) {
             Operand keyOperand;
 
-            if (pair instanceof AssocNode) {
-                Node key = ((AssocNode) pair).key;
+            if (pair instanceof AssocNode assoc) {
+                Node key = assoc.key;
 
-                if (key instanceof StringNode) {  // FIXME: #2045 in prism about whether it should be marked frozen by parser.
-                    keyOperand = buildFrozenString((StringNode) key);
+                if (key instanceof StringNode str) {  // FIXME: #2045 in prism about whether it should be marked frozen by parser.
+                    keyOperand = buildFrozenString(str);
 
                     String hack = ((FrozenString) keyOperand).getByteList().toString();
                     if (!keysHack.add(hack)) getManager().getRuntime().getWarnings().warn("key \"" + hack + "\" is duplicated and overwritten on line " + (getLine(key) + 1));
                 } else {
                     keyOperand = build(key);
-                    if (keyOperand instanceof Symbol) {
-                        String hack = ((Symbol) keyOperand).getString();
+                    if (keyOperand instanceof Symbol sym) {
+                        String hack = sym.getString();
                         if (!keysHack.add(hack)) getManager().getRuntime().getWarnings().warn("key :" + hack + " is duplicated and overwritten on line " + (getLine(key) + 1));
-                    } else if (keyOperand instanceof Fixnum) {
-                        long hack = ((Fixnum) keyOperand).value;
+                    } else if (keyOperand instanceof Fixnum fix) {
+                        long hack = fix.value;
                         if (!keysHack.add(Long.valueOf(hack))) getManager().getRuntime().getWarnings().warn("key " + hack + " is duplicated and overwritten on line " + (getLine(key) + 1));
-                    } else if (keyOperand instanceof Float) {
-                        double hack = ((Float) keyOperand).value;
+                    } else if (keyOperand instanceof Float flote) {
+                        double hack = flote.value;
                         if (!keysHack.add(Double.valueOf(hack))) getManager().getRuntime().getWarnings().warn("key " + hack + " is duplicated and overwritten on line " + (getLine(key) + 1));
                     }
                 }
-                args.add(new KeyValuePair<>(keyOperand, buildWithOrder(((AssocNode) pair).value, hasAssignments)));
+                args.add(new KeyValuePair<>(keyOperand, buildWithOrder(assoc.value, hasAssignments)));
             } else {  // AssocHashNode
                 AssocSplatNode assoc = (AssocSplatNode) pair;
                 boolean isLiteral = assoc.value instanceof HashNode;
@@ -1371,8 +1358,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
         IRubyObject number = RubyNumeric.str2inum(getManager().runtime, getManager().getRuntime().newString(sanitizedValue), base, false, false);
 
-        return number instanceof RubyBignum ?
-                new Bignum(((RubyBignum) number).getBigIntegerValue()) :
+        return number instanceof RubyBignum bignum ?
+                new Bignum(bignum.getBigIntegerValue()) :
                 fix(RubyNumeric.fix2long(number));
     }
 
@@ -1450,9 +1437,9 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         // Duplication checks happen when **{} are literals and not **h variable references.
         Operand duplicateCheck = fals();
 
-        if (node.elements.length == 1 && node.elements[0] instanceof AssocSplatNode) { // Only a single rest arg here.  Do not bother to merge.
+        if (node.elements.length == 1 && node.elements[0] instanceof AssocSplatNode assocSplat) { // Only a single rest arg here.  Do not bother to merge.
             flags[0] |= CALL_KEYWORD_REST;
-            Operand splat = buildWithOrder(((AssocSplatNode) node.elements[0]).value, hasAssignments);
+            Operand splat = buildWithOrder(assocSplat.value, hasAssignments);
 
             return addResultInstr(new RuntimeHelperCall(temp(), HASH_CHECK, new Operand[] { splat }));
         }
@@ -1461,9 +1448,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         for (Node pair: node.elements) {
             Operand keyOperand;
 
-            if (pair instanceof AssocNode) {
-                keyOperand = build(((AssocNode) pair).key);
-                args.add(new KeyValuePair<>(keyOperand, buildWithOrder(((AssocNode) pair).value, hasAssignments)));
+            if (pair instanceof AssocNode assoc) {
+                args.add(new KeyValuePair<>(build(assoc.key), buildWithOrder(assoc.value, hasAssignments)));
             } else {  // AssocHashNode
                 flags[0] |= CALL_KEYWORD_REST;
                 AssocSplatNode assoc = (AssocSplatNode) pair;
@@ -1643,8 +1629,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         }
 
         if (rest != null) {
-            if (rest instanceof SplatNode) {
-                Node realTarget = ((SplatNode) rest).expression;
+            if (rest instanceof SplatNode splat) {
+                Node realTarget = splat.expression;
                 var get = new RestArgMultipleAsgnInstr(temp(), values, 0, pre.length, post.length);
                 if (realTarget == null) {
                     assigns.add(new Tuple<>(rest, get));
@@ -1746,9 +1732,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             int keywordsCount = parameters.keywords.length;
             Node[] kwArgs = parameters.keywords;
             for (int i = 0; i < keywordsCount; i++) {
-                if (kwArgs[i] instanceof  OptionalKeywordParameterNode) {
-                    buildKeywordParameter(keywords, ((OptionalKeywordParameterNode) kwArgs[i]).name,
-                            ((OptionalKeywordParameterNode) kwArgs[i]).value);
+                if (kwArgs[i] instanceof  OptionalKeywordParameterNode optkwarg) {
+                    buildKeywordParameter(keywords, optkwarg.name, optkwarg.value);
                 } else { // RequiredKeywordParameterNode
                     buildKeywordParameter(keywords, ((RequiredKeywordParameterNode) kwArgs[i]).name, null);
                 }
@@ -1756,8 +1741,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         }
 
 
-        if (parameters.keyword_rest != null && parameters.keyword_rest instanceof KeywordRestParameterNode) {
-            RubySymbol key = ((KeywordRestParameterNode) parameters.keyword_rest).name;
+        if (parameters.keyword_rest != null && parameters.keyword_rest instanceof KeywordRestParameterNode kwrest) {
+            RubySymbol key = kwrest.name;
             ArgumentType type;
             if (key == null) {
                 key = symbol(STAR_STAR);
@@ -1987,8 +1972,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     private void buildWhenSplatValues(Variable eqqResult, Node node, Operand testValue, Label bodyLabel,
                                       Set<IRubyObject> seenLiterals, Map<IRubyObject, java.lang.Integer> origLocs) {
         // FIXME: could see errors since this is missing whatever is YARP args{cat,push}?
-        if (node instanceof StatementsNode) {
-            buildWhenValues(eqqResult, ((StatementsNode) node).body, testValue, bodyLabel, seenLiterals, origLocs);
+        if (node instanceof StatementsNode stmts) {
+            buildWhenValues(eqqResult, stmts.body, testValue, bodyLabel, seenLiterals, origLocs);
         } else if (node instanceof SplatNode) {
             buildWhenValue(eqqResult, testValue, bodyLabel, node, seenLiterals, origLocs, true);
         } else {
@@ -2048,11 +2033,11 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         while (true) { // loop to unwrap EvStr
 
             // FIXME: missing EmbddedVariableNode.
-            if (pieceNode instanceof StringNode) {
+            if (pieceNode instanceof StringNode str) {
                 // FIXME: This is largely a duplicate buildString.  It can be partially genericalized.
                 ByteList data = encoding == null ?
-                        bytelistFrom((StringNode) pieceNode) :
-                        new ByteList(((StringNode) pieceNode).unescaped, encoding);
+                        bytelistFrom(str) :
+                        new ByteList(str.unescaped, encoding);
 
                 if (((StringNode) pieceNode).isFrozen()) {
                     piece = new FrozenString(data, CR_UNKNOWN, scope.getFile(), getLine(pieceNode));
@@ -2061,15 +2046,15 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                 }
 
                 estimatedSize += data.realSize();
-            } else if (pieceNode instanceof EmbeddedStatementsNode) {
+            } else if (pieceNode instanceof EmbeddedStatementsNode embed) {
                 if (scope.maybeUsingRefinements()) {
                     // refined asString must still go through dispatch
                     Variable result = temp();
-                    addInstr(new AsStringInstr(scope, result, build(((EmbeddedStatementsNode) pieceNode).statements), scope.maybeUsingRefinements()));
+                    addInstr(new AsStringInstr(scope, result, build(embed.statements), scope.maybeUsingRefinements()));
                     piece = result;
                 } else {
                     // evstr/asstring logic lives in BuildCompoundString now, unwrap and try again
-                    pieceNode = ((EmbeddedStatementsNode) pieceNode).statements;
+                    pieceNode = embed.statements;
                     continue;
                 }
             } else {
@@ -2079,8 +2064,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             break;
         }
 
-        if (piece instanceof MutableString) {
-            piece = ((MutableString)piece).frozenString;
+        if (piece instanceof MutableString mut) {
+            piece = mut.frozenString;
         }
 
         pieces[i] = piece == null ? nil() : piece;
@@ -2156,8 +2141,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             // So, we generate an implicit arg name
             RubySymbol argName;
 
-            if (args.rest instanceof RestParameterNode) {
-                RestParameterNode restArg = (RestParameterNode) args.rest;
+            if (args.rest instanceof RestParameterNode restArg) {
                     // FIXME: how do we annotate generated AST types to have isAnonymous etc...
                 if (restArg.name == null) {
                     argName = symbol("*");
@@ -2185,9 +2169,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
     // FIXME: I dislike both methods and procs use the same method.
     public void receivePreArg(Node node, Variable keywords, int argIndex) {
-        if (node instanceof RequiredParameterNode) { // methods
-            RubySymbol name = ((RequiredParameterNode) node).name;
-
+        if (node instanceof RequiredParameterNode req) { // methods
+            var name = req.name;
             addArgumentDescription(ArgumentType.req, name);
 
             addInstr(new ReceivePreReqdArgInstr(argumentResult(name), keywords, argIndex));
@@ -2197,25 +2180,25 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             addArgumentDescription(ArgumentType.anonreq, null);
             Variable rhs = addResultInstr(new ToAryInstr(temp(), v));
             buildMultiWriteOrTargetNode(multi.lefts, multi.rest, multi.rights, rhs);
-        } else if (node instanceof ClassVariableTargetNode) {  // blocks/for
+        } else if (node instanceof ClassVariableTargetNode cvar) {  // blocks/for
             Variable v = temp();
             addInstr(new ReceivePreReqdArgInstr(v, keywords, argIndex));
-            addInstr(new PutClassVariableInstr(classVarDefinitionContainer(), ((ClassVariableTargetNode) node).name, v));
-        } else if (node instanceof ConstantTargetNode) {  // blocks/for
+            addInstr(new PutClassVariableInstr(classVarDefinitionContainer(), cvar.name, v));
+        } else if (node instanceof ConstantTargetNode constant) {  // blocks/for
             Variable v = temp();
             addInstr(new ReceivePreReqdArgInstr(v, keywords, argIndex));
-            putConstant(((ConstantTargetNode) node).name, v);
-        } else if (node instanceof InstanceVariableTargetNode) {  // blocks/for
+            putConstant(constant.name, v);
+        } else if (node instanceof InstanceVariableTargetNode ivar) {  // blocks/for
             Variable v = temp();
             addInstr(new ReceivePreReqdArgInstr(v, keywords, argIndex));
-            addInstr(new PutFieldInstr(buildSelf(), ((InstanceVariableTargetNode) node).name, v));
-        } else if (node instanceof LocalVariableTargetNode) {  // blocks/for
-            Variable v = getLocalVariable(((LocalVariableTargetNode) node).name, ((LocalVariableTargetNode) node).depth);
+            addInstr(new PutFieldInstr(buildSelf(), ivar.name, v));
+        } else if (node instanceof LocalVariableTargetNode lvar) {  // blocks/for
+            Variable v = getLocalVariable(lvar.name, lvar.depth);
             addInstr(new ReceivePreReqdArgInstr(v, keywords, argIndex));
-        } else if (node instanceof GlobalVariableTargetNode target) {
+        } else if (node instanceof GlobalVariableTargetNode gvar) {
             Variable v = temp();
             addInstr(new ReceivePreReqdArgInstr(v, keywords, argIndex));
-            addInstr(new PutGlobalVarInstr(target.name, v));
+            addInstr(new PutGlobalVarInstr(gvar.name, v));
         } else if (node instanceof CallTargetNode call) {
             var v = addResultInstr(new ReceivePreReqdArgInstr(temp(), keywords, argIndex));
             buildCallTarget(call, build(call.receiver), v);
@@ -2234,8 +2217,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     public void receivePostArg(Node node, Variable keywords, int argIndex, int preCount, int optCount, boolean hasRest, int postCount) {
-        if (node instanceof RequiredParameterNode) {
-            RubySymbol argName = ((RequiredParameterNode) node).name;
+        if (node instanceof RequiredParameterNode req) {
+            RubySymbol argName = req.name;
 
             addArgumentDescription(ArgumentType.req, argName);
 
@@ -2327,11 +2310,11 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         if (args == null) {
             return UndefinedValue.UNDEFINED;
         } else if (args.length == 1) {
-            if (args[0] instanceof SplatNode) { // yield *c
+            if (args[0] instanceof SplatNode splat) { // yield *c
                 flags[0] |= CALL_SPLATS;
-                return new Splat(buildSplat((SplatNode) args[0]));
-            } else if (args[0] instanceof KeywordHashNode) {
-                return buildKeywordHash((KeywordHashNode) args[0], flags);
+                return new Splat(buildSplat(splat));
+            } else if (args[0] instanceof KeywordHashNode kwhash) {
+                return buildKeywordHash(kwhash, flags);
             } else { // ???
                 return build(args[0]);
             }
@@ -2339,20 +2322,20 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             int lastSplat = -1;
             Operand[] operands = new Operand[args.length];
             for (int i = 0; i < args.length; i++) {
-                if (args[i] instanceof SplatNode) { // yield with a splat in it in any position
+                if (args[i] instanceof SplatNode splat) { // yield with a splat in it in any position
                     if (lastSplat != -1) { // already one splat encountered
-                        operands[i] = twoArgs(operands, lastSplat, i, buildSplat((SplatNode) args[i]), flags);
+                        operands[i] = twoArgs(operands, lastSplat, i, buildSplat(splat), flags);
                     } else { // first and possibly only splat
                         flags[0] |= CALL_SPLATS; // FIXME: not sure all splats count?
                         if (i == 0) {
-                            operands[i] = buildSplat((SplatNode) args[i]);
+                            operands[i] = buildSplat(splat);
                         } else {
-                            operands[i] = catArgs(operands, 0, i, buildSplat((SplatNode) args[i]), flags);
+                            operands[i] = catArgs(operands, 0, i, buildSplat(splat), flags);
                         }
                     }
                     lastSplat = i;
-                } else if (args[i] instanceof KeywordHashNode) {
-                    operands[i] = buildKeywordHash((KeywordHashNode) args[i], flags);
+                } else if (args[i] instanceof KeywordHashNode kwhash) {
+                    operands[i] = buildKeywordHash(kwhash, flags);
                 } else {
                     operands[i] = build(args[i]);
                 }
@@ -2446,9 +2429,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
         if (node instanceof ConstantReadNode) {
             return findContainerModule();
-        } else if (node instanceof ConstantPathNode) {
-            ConstantPathNode path = (ConstantPathNode) node;
-
+        } else if (node instanceof ConstantPathNode path) {
             if (path.parent == null) { // ::Foo
                 return getManager().getObjectClass();
             } else {
@@ -2461,45 +2442,37 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
     @Override
     protected Variable buildPatternEach(Label testEnd, Variable result, Operand original, Variable deconstructed, Operand value, Node exprNodes, boolean inAlternation, boolean isSinglePattern, Variable errorString) {
-        if (exprNodes instanceof StatementsNode && ((StatementsNode) exprNodes).body.length == 1) {
-            buildPatternEach(testEnd, result, original, deconstructed, value, ((StatementsNode) exprNodes).body[0], inAlternation, isSinglePattern, errorString);
-        } else if (exprNodes instanceof ArrayPatternNode) {
-            ArrayPatternNode node = (ArrayPatternNode) exprNodes;
+        if (exprNodes instanceof StatementsNode stmts && stmts.body.length == 1) {
+            buildPatternEach(testEnd, result, original, deconstructed, value, stmts.body[0], inAlternation, isSinglePattern, errorString);
+        } else if (exprNodes instanceof ArrayPatternNode node) {
             buildArrayPattern(testEnd, result, deconstructed, node.constant, node.requireds, node.rest, node.posts, value, inAlternation, isSinglePattern, errorString);
-        } else if (exprNodes instanceof CapturePatternNode) {
-            buildPatternEach(testEnd, result, original, deconstructed, value, ((CapturePatternNode) exprNodes).value, inAlternation, isSinglePattern, errorString);
-            buildAssignment(((CapturePatternNode) exprNodes).target, value);
-        } else if (exprNodes instanceof HashPatternNode) {
-            HashPatternNode node = (HashPatternNode) exprNodes;
+        } else if (exprNodes instanceof CapturePatternNode capture) {
+            buildPatternEach(testEnd, result, original, deconstructed, value, capture.value, inAlternation, isSinglePattern, errorString);
+            buildAssignment(capture.target, value);
+        } else if (exprNodes instanceof HashPatternNode node) {
             Node[] keys = getKeys(node);
             buildHashPattern(testEnd, result, deconstructed, node.constant, node, keys, node.rest, value, inAlternation, isSinglePattern, errorString);
-        } else if (exprNodes instanceof FindPatternNode) {
+        } else if (exprNodes instanceof FindPatternNode node) {
             getManager().getRuntime().getWarnings().warnExperimental(getFileName(), getLine(exprNodes) + 1,
                     "Find pattern is experimental, and the behavior may change in future versions of Ruby!");
-            FindPatternNode node = (FindPatternNode) exprNodes;
             buildFindPattern(testEnd, result, deconstructed, node.constant, node.left, node.requireds, node.right, value, inAlternation, isSinglePattern, errorString);
-        } else if (exprNodes instanceof IfNode) {
-            IfNode node = (IfNode) exprNodes;
+        } else if (exprNodes instanceof IfNode node) {
             buildPatternEachIf(result, original, deconstructed, value, node.predicate, node.statements, node.subsequent, inAlternation, isSinglePattern, errorString);
-        } else if (exprNodes instanceof UnlessNode) {
-            UnlessNode node = (UnlessNode) exprNodes;
+        } else if (exprNodes instanceof UnlessNode node) {
             buildPatternEachIf(result, original, deconstructed, value, node.predicate, node.else_clause, node.statements, inAlternation, isSinglePattern, errorString);
-        } else if (exprNodes instanceof LocalVariableTargetNode) {
-            buildPatternLocal((LocalVariableTargetNode) exprNodes, value, inAlternation);
-        } else if (exprNodes instanceof ImplicitNode) {
-            buildPatternEach(testEnd, result, original, deconstructed, value, ((ImplicitNode) exprNodes).value, inAlternation, isSinglePattern, errorString);
-        } else if (exprNodes instanceof AssocSplatNode) {
-            AssocSplatNode node = (AssocSplatNode) exprNodes;
-
+        } else if (exprNodes instanceof LocalVariableTargetNode node) {
+            buildPatternLocal(node, value, inAlternation);
+        } else if (exprNodes instanceof ImplicitNode node) {
+            buildPatternEach(testEnd, result, original, deconstructed, value, node.value, inAlternation, isSinglePattern, errorString);
+        } else if (exprNodes instanceof AssocSplatNode node) {
             buildPatternLocal((LocalVariableTargetNode) node.value, value, inAlternation);
         } else if (exprNodes instanceof ImplicitRestNode) {
             // do nothing
-        } else if (exprNodes instanceof SplatNode) {
-            buildAssignment(((SplatNode) exprNodes).expression, value);
+        } else if (exprNodes instanceof SplatNode splat) {
+            buildAssignment(splat.expression, value);
             // do nothing
-        } else if (exprNodes instanceof AlternationPatternNode) {
-            buildPatternOr(testEnd, original, result, deconstructed, value, ((AlternationPatternNode) exprNodes).left,
-                    ((AlternationPatternNode) exprNodes).right, isSinglePattern, errorString);
+        } else if (exprNodes instanceof AlternationPatternNode node) {
+            buildPatternOr(testEnd, original, result, deconstructed, value, node.left, node.right, isSinglePattern, errorString);
         } else {
             Operand expression = build(exprNodes);
             boolean needsSplat = exprNodes instanceof AssocSplatNode; // FIXME: just a guess this is all we need for splat?
@@ -2527,22 +2500,9 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     private Node[] getKeys(HashPatternNode node) {
         int length = node.elements.length;
         Node[] keys = new Node[length];
-        int i = 0;
 
-        for (; i < length; i++) {
-            if (node.elements[i] instanceof AssocNode) {
-                AssocNode assoc = (AssocNode) node.elements[i];
-
-                keys[i] = assoc.key;
-            } else {
-                break; // rest kwarg at end we should ignore.
-            }
-        }
-
-        if (i != length) {
-            Node[] newKeys = new Node[i];
-            System.arraycopy(keys, 0, newKeys, 0, i);
-            return newKeys;
+        for (int i = 0; i < length; i++) {
+            keys[i] = node.elements[i].key;
         }
 
         return keys;
@@ -2557,27 +2517,27 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
         for (Node node: assocs.elements) {
             // FIXME: There can be more than  AssocNode in here.
-            if (node instanceof AssocNode) {
+            if (node instanceof AssocNode assoc) {
                 // FIXME: only build literals (which are guaranteed to build without raising).
-                Operand key = build(((AssocNode) node).key);
+                Operand key = build(assoc.key);
                 call(result, d, "key?", key);
                 cond_ne_true(testEnd, result);
 
                 String method = hasRest ? "delete" : "[]";
                 Operand value = call(temp(), d, method, key);
-                Node valueNode =  ((AssocNode) node).value;
+                Node valueNode =  assoc.value;
                 if (valueNode == null) {
-                    Node keyHack = ((AssocNode) node).key;
+                    Node keyHack = assoc.key;
                     RubySymbol name = null;
-                    if (keyHack instanceof SymbolNode) {
-                        name = symbol((SymbolNode) keyHack);
+                    if (keyHack instanceof SymbolNode sym) {
+                        name = symbol(sym);
                     } else {
                         throwSyntaxError(getLine(node), "what else is in this");
                     }
                     // FIXME: This needs depth.
                     buildPatternLocal(value, name, getLine(node), 0, inAlteration);
                 } else {
-                    buildPatternEach(testEnd, result, original, copy(nil()), value, ((AssocNode) node).value, inAlteration, isSinglePattern, errorString);
+                    buildPatternEach(testEnd, result, original, copy(nil()), value, assoc.value, inAlteration, isSinglePattern, errorString);
                 }
 
                 cond_ne_true(testEnd, result);
@@ -2602,7 +2562,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
     @Override
     protected boolean isBareStar(Node node) {
-        return node instanceof AssocSplatNode && ((AssocSplatNode) node).value == null;
+        return node instanceof AssocSplatNode assoc && assoc.value == null;
     }
 
     private int getEndLine(Node node) {
@@ -2656,8 +2616,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             return runtime.getTrue();
         } else if (node instanceof FalseNode) {
             return runtime.getFalse();
-        } else if (node instanceof SymbolNode) {
-            return symbol((SymbolNode) node);
+        } else if (node instanceof SymbolNode sym) {
+            return symbol(sym);
         } else if (node instanceof StringNode) {
             return runtime.newString((bytelistFrom((StringNode) node)));
         }
@@ -2703,8 +2663,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
         if (block instanceof BlockNode) {
             return build(block);
-        } else if (block instanceof BlockArgumentNode) {
-            return buildBlockArgument((BlockArgumentNode) block);
+        } else if (block instanceof BlockArgumentNode blarg) {
+            return buildBlockArgument(blarg);
         }
 
         throw notCompilable("Encountered unexpected block node", block);
@@ -2755,10 +2715,10 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     private Signature calculateSignature(Node parameters) {
         if (parameters == null) return Signature.NO_ARGUMENTS;
 
-        if (parameters instanceof BlockParametersNode) {
-            return calculateSignature(((BlockParametersNode) parameters).parameters);
-        } else if (parameters instanceof NumberedParametersNode) {
-            return Signature.from(((NumberedParametersNode) parameters).maximum, 0, 0, 0, 0, Signature.Rest.NONE, -1);
+        if (parameters instanceof BlockParametersNode params) {
+            return calculateSignature(params.parameters);
+        } else if (parameters instanceof NumberedParametersNode params) {
+            return Signature.from(params.maximum, 0, 0, 0, 0, Signature.Rest.NONE, -1);
         } else if (parameters instanceof ItParametersNode) {
             return Signature.from(1, 0, 0, 0, 0, Signature.Rest.NONE, -1);
         }
@@ -2767,8 +2727,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private Signature calculateSignatureFor(Node node) {
-        if (node instanceof MultiTargetNode) {
-            MultiTargetNode multi = (MultiTargetNode) node;
+        if (node instanceof MultiTargetNode multi) {
             Signature.Rest rest = multi.rest != null ? Signature.Rest.NORM : Signature.Rest.NONE;
             return Signature.from(multi.lefts.length, 0, multi.rights.length, 0, 0, rest, -1);
         } else {
@@ -2792,10 +2751,10 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     private ByteList determineBaseName(Node node) {
-        if (node instanceof ConstantReadNode) {
-            return ((ConstantReadNode) node).name.getBytes();
-        } else if (node instanceof ConstantPathNode) {
-            return ((ConstantPathNode) node).name.getBytes();
+        if (node instanceof ConstantReadNode constant) {
+            return constant.name.getBytes();
+        } else if (node instanceof ConstantPathNode path) {
+            return path.name.getBytes();
         }
         throw notCompilable("Unsupported node in module path", node);
     }
@@ -2811,11 +2770,12 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
     // FIXME: We need abstraction for getting names from nodes.
     private RubySymbol globalVariableName(Node node) {
-        if (node instanceof GlobalVariableReadNode) return ((GlobalVariableReadNode) node).name;
-        if (node instanceof BackReferenceReadNode) return ((BackReferenceReadNode) node).name;
-        if (node instanceof NumberedReferenceReadNode) return symbol("$" + ((NumberedReferenceReadNode) node).number);
-
-        throw notCompilable("Unknown global variable type", node);
+        return switch(node) {
+            case GlobalVariableReadNode gvar -> gvar.name;
+            case BackReferenceReadNode backref -> backref.name;
+            case NumberedReferenceReadNode numref -> symbol("$" + numref.number);
+            default -> throw notCompilable("Unknown global variable type", node);
+        };
     }
 
     private NotCompilableException notCompilable(String message, Node node) {
@@ -2874,7 +2834,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         Label existsDone = getNewLabel();
         Label done = getNewLabel();
         Operand def = buildGetDefinition2(definitionNode);
-        Variable result = def instanceof Variable ? (Variable) def : copy(temp(), def);
+        Variable result = def instanceof Variable var ? var : copy(temp(), def);
         addInstr(createBranch(result, nil(), existsDone));
         getter.run(result);
         addInstr(new LabelInstr(existsDone));
