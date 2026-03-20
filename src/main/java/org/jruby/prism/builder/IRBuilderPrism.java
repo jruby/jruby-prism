@@ -1744,7 +1744,11 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         }
 
 
-        if (parameters.keyword_rest != null && parameters.keyword_rest instanceof KeywordRestParameterNode kwrest) {
+        if (parameters.keyword_rest instanceof NoKeywordsParameterNode) {
+            addArgumentDescription(ArgumentType.nokey, null);
+            // I don't think we need to slurp up anything to **nil so no recv instr here.
+        } else if (parameters.keyword_rest instanceof KeywordRestParameterNode kwrest) {
+            System.out.println("B");
             RubySymbol key;
             ArgumentType type;
             if (kwrest.name == null) {
