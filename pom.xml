@@ -77,7 +77,7 @@
     </dependency>
     <dependency>
       <groupId>org.ruby-lang</groupId>
-      <artifactId>prism-parser-wasm</artifactId>
+      <artifactId>prism-parser</artifactId>
       <version>0.0.1-SNAPSHOT</version>
     </dependency>
   </dependencies>

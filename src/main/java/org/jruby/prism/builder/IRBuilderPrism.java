@@ -1745,12 +1745,13 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
 
         if (parameters.keyword_rest != null && parameters.keyword_rest instanceof KeywordRestParameterNode kwrest) {
-            RubySymbol key = symbol(kwrest.name);
+            RubySymbol key;
             ArgumentType type;
-            if (key == null) {
+            if (kwrest.name == null) {
                 key = symbol(STAR_STAR);
                 type = ArgumentType.anonkeyrest;
             } else {
+                key = symbol(kwrest.name);
                 type = ArgumentType.keyrest;
             }
 
@@ -2088,7 +2089,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         // reify to Proc if we have a block arg
         if (blockArg != null) {
             // FIXME: Handle bare '&' case?
-            RubySymbol name = symbol(blockArg.name) == null ? symbol(FWD_BLOCK) : symbol(blockArg.name);
+            RubySymbol name = blockArg.name == null ? symbol(FWD_BLOCK) : symbol(blockArg.name);
             Variable blockVar = argumentResult(name);
             addArgumentDescription(ArgumentType.block, name);
             Variable tmp = temp();
@@ -2146,7 +2147,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
             if (args.rest instanceof RestParameterNode restArg) {
                     // FIXME: how do we annotate generated AST types to have isAnonymous etc...
-                if (symbol(restArg.name) == null) {
+                if (restArg.name == null) {
                     argName = symbol("*");
                     addArgumentDescription(ArgumentType.anonrest, argName);
                 } else {
