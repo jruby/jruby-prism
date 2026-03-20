@@ -378,49 +378,43 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         return result;
     }
 
+    private Node[] argumentsFrom(ArgumentsNode node) {
+        return node == null ? Node.EMPTY_ARRAY : node.arguments;
+    }
+
     // This method is called to build assignments for a multiple-assignment instruction
     protected void buildAssignment(Node node, Operand rhsVal) {
         if (node == null) return; // case of 'a, = something'
 
-        if (node instanceof CallTargetNode call) {
-            buildCallTarget(call, build(call.receiver), rhsVal);
-        } else if (node instanceof IndexTargetNode) {
-            Node[] arguments = ((IndexTargetNode) node).arguments == null ? Node.EMPTY_ARRAY : ((IndexTargetNode) node).arguments.arguments;
-            buildAttrAssignAssignment(((IndexTargetNode) node).receiver, symbol("[]="), arguments, rhsVal);
-        } else if (node instanceof ClassVariableTargetNode) {
-            addInstr(new PutClassVariableInstr(classVarDefinitionContainer(), ((ClassVariableTargetNode) node).name, rhsVal));
-        } else if (node instanceof ConstantPathTargetNode) {
-            Operand parent = buildModuleParent(((ConstantPathTargetNode) node).parent);
-            RubySymbol name = ((ConstantPathTargetNode) node).name;
-            addInstr(new PutConstInstr(parent, name, rhsVal));
-        } else if (node instanceof ConstantTargetNode) {
-            addInstr(new PutConstInstr(getCurrentModuleVariable(), ((ConstantTargetNode) node).name, rhsVal));
-        } else if (node instanceof LocalVariableTargetNode) {
-            LocalVariableTargetNode variable = (LocalVariableTargetNode) node;
-            copy(getLocalVariable(variable.name, variable.depth), rhsVal);
-        } else if (node instanceof GlobalVariableTargetNode) {
-            addInstr(new PutGlobalVarInstr(((GlobalVariableTargetNode) node).name, rhsVal));
-        } else if (node instanceof InstanceVariableTargetNode) {
-            addInstr(new PutFieldInstr(buildSelf(), ((InstanceVariableTargetNode) node).name, rhsVal));
-        } else if (node instanceof MultiTargetNode) {
-            var multi = (MultiTargetNode) node;
-            Variable rhs = addResultInstr(new ToAryInstr(temp(), rhsVal));
-            Map<Node, Operand> reads = new HashMap<>();
-            final List<Tuple<Node, ResultInstr>> assigns = new ArrayList<>(4);
-            buildMultiAssignment(multi.lefts, multi.rest, multi.rights, rhs, reads, assigns);
+        switch (node) {
+            case CallTargetNode call -> buildCallTarget(call, build(call.receiver), rhsVal);
+            case IndexTargetNode index -> buildAttrAssignAssignment(index.receiver, symbol("[]="),
+                    argumentsFrom(index.arguments), rhsVal);
+            case ClassVariableTargetNode cvar ->
+                    addInstr(new PutClassVariableInstr(classVarDefinitionContainer(), cvar.name, rhsVal));
+            case ConstantPathTargetNode cpath ->
+                    addInstr(new PutConstInstr(buildModuleParent(cpath.parent), cpath.name, rhsVal));
+            case ConstantTargetNode constant ->
+                    addInstr(new PutConstInstr(getCurrentModuleVariable(), constant.name, rhsVal));
+            case LocalVariableTargetNode lvar -> copy(getLocalVariable(lvar.name, lvar.depth), rhsVal);
+            case GlobalVariableTargetNode gvar -> addInstr(new PutGlobalVarInstr(gvar.name, rhsVal));
+            case InstanceVariableTargetNode ivar -> addInstr(new PutFieldInstr(buildSelf(), ivar.name, rhsVal));
+            case MultiTargetNode multi -> {
+                Variable rhs = addResultInstr(new ToAryInstr(temp(), rhsVal));
 
-            for (Tuple<Node, ResultInstr> assign: assigns) {
-                addInstr((Instr) assign.b);
+                Map<Node, Operand> reads = new HashMap<>();
+                final List<Tuple<Node, ResultInstr>> assigns = new ArrayList<>(4);
+                buildMultiAssignment(multi.lefts, multi.rest, multi.rights, rhs, reads, assigns);
+
+                for (Tuple<Node, ResultInstr> assign : assigns) {
+                    addInstr((Instr) assign.b);
+                }
+
+                buildAssignment(reads, assigns);
             }
-
-            buildAssignment(reads, assigns);
-        } else if (node instanceof RequiredParameterNode) {
-            RequiredParameterNode variable = (RequiredParameterNode) node;
-            copy(getLocalVariable(variable.name, 0), rhsVal);
-        } else if (node instanceof SplatNode) { // FIXME: Audit this...is there really a splat here and it has phatom expression field?
-            buildSplat(rhsVal);
-        } else {
-            throw notCompilable("Can't build assignment node", node);
+            case RequiredParameterNode variable -> copy(getLocalVariable(variable.name, 0), rhsVal);
+            case SplatNode _splat -> buildSplat(rhsVal);
+            default -> throw notCompilable("Can't build assignment node", node);
         }
     }
 
@@ -1680,7 +1674,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             case CallTargetNode call -> reads.put(call.receiver, build(call.receiver));
             case IndexTargetNode index -> {
                 reads.put(index.receiver, build(index.receiver));
-                Node[] arguments = index.arguments == null ? Node.EMPTY_ARRAY : index.arguments.arguments;
+                Node[] arguments = argumentsFrom(index.arguments);
                 int[] flags = new int[] { 0 };
                 Operand[] args = buildCallArgsArray(arguments, flags);
                 Operand[] hackyArgs = new Operand[args.length + 1];
