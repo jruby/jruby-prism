@@ -4,7 +4,6 @@ import org.jcodings.Encoding;
 import org.jruby.Ruby;
 import org.jruby.util.ByteList;
 import org.ruby_lang.prism.Loader;
-import org.ruby_lang.prism.Nodes;
 import org.ruby_lang.prism.ParseResult;
 
 /**
@@ -16,8 +15,8 @@ public class LoaderPrism extends Loader {
 
     private Encoding encoding = null;
 
-    LoaderPrism(Ruby runtime, byte[] serialized, byte[] source) {
-        super(serialized, source);
+    LoaderPrism(Ruby runtime, byte[] serialized) {
+        super(serialized);
 
         this.runtime = runtime;
     }
@@ -30,9 +29,9 @@ public class LoaderPrism extends Loader {
         return result;
     }
 
-    public org.jruby.RubySymbol bytesToName(byte[] bytes) {
+    public byte[] bytesToName(byte[] bytes) {
         resolveEncoding();
-        return runtime.newSymbol(new ByteList(bytes, encoding));
+        return bytes;
     }
 
     private void resolveEncoding() {

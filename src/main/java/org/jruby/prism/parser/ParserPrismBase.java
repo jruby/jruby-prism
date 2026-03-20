@@ -31,6 +31,7 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.stream.IntStream;
 
+import static org.jruby.api.Convert.asSymbol;
 import static org.jruby.parser.ParserType.EVAL;
 import static org.jruby.parser.ParserType.INLINE;
 import static org.jruby.parser.ParserType.MAIN;
@@ -57,7 +58,7 @@ public abstract class ParserPrismBase extends Parser {
         long time = 0;
 
         if (parserTiming) time = System.nanoTime();
-        LoaderPrism loader = new LoaderPrism(runtime, serialized, source);
+        LoaderPrism loader = new LoaderPrism(runtime, serialized);
         org.ruby_lang.prism.ParseResult res = loader.load();
         Encoding encoding = loader.getEncoding();
 
@@ -106,12 +107,13 @@ public abstract class ParserPrismBase extends Parser {
             coverageMode = runtime.getCoverageData().getMode();
         }
 
-        ParseResultPrism result = new ParseResultPrism(fileName, source, (ProgramNode) res.value, res.source, encoding, coverageMode);
+        ParseResultPrism result = new ParseResultPrism(runtime, fileName, source, (ProgramNode) res.value, res.source, encoding, coverageMode);
         if (blockScope != null) {
             if (type == MAIN) { // update TOPLEVEL_BINDNG
-                RubySymbol[] locals = ((ProgramNode) result.getAST()).locals;
+                byte[][] locals = ((ProgramNode) result.getAST()).locals;
+                var context = runtime.getCurrentContext();
                 for (int i = 0; i < locals.length; i++) {
-                    blockScope.getStaticScope().addVariableThisScope(locals[i].idString());
+                    blockScope.getStaticScope().addVariableThisScope(asSymbol(context, new ByteList(locals[i], encoding)).idString());
                 }
                 blockScope.growIfNeeded();
                 result.setDynamicScope(blockScope);

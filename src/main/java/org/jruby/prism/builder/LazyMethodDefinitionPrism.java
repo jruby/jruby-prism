@@ -1,11 +1,13 @@
 package org.jruby.prism.builder;
 
 import org.jcodings.Encoding;
+import org.jruby.Ruby;
 import org.jruby.ir.IRManager;
 import org.jruby.ir.IRMethod;
 import org.jruby.ir.builder.IRBuilder;
 import org.jruby.ir.builder.LazyMethodDefinition;
 import org.jruby.prism.builder.IRBuilderPrism;
+import org.jruby.util.ByteList;
 import org.ruby_lang.prism.AbstractNodeVisitor;
 import org.ruby_lang.prism.Nodes;
 import org.ruby_lang.prism.Nodes.ConstantPathNode;
@@ -19,14 +21,18 @@ import org.ruby_lang.prism.Nodes.WhenNode;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.jruby.api.Convert.asSymbol;
+
 public class LazyMethodDefinitionPrism implements LazyMethodDefinition<Node, DefNode, WhenNode, RescueNode, ConstantPathNode, Nodes.HashPatternNode> {
+    private final Ruby runtime;
     private final Nodes.Source nodeSource;
     private DefNode node;
     private byte[] source;
 
     final private Encoding encoding;
 
-    public LazyMethodDefinitionPrism(byte[] source, Nodes.Source nodeSource, Encoding encoding, DefNode node) {
+    public LazyMethodDefinitionPrism(Ruby runtime, byte[] source, Nodes.Source nodeSource, Encoding encoding, DefNode node) {
+        this.runtime = runtime;
         this.source = source;
         this.node = node;
         this.nodeSource = nodeSource;
@@ -40,6 +46,7 @@ public class LazyMethodDefinitionPrism implements LazyMethodDefinition<Node, Def
     @Override
     public List<String> getMethodData() {
         List<String> ivarNames = new ArrayList<>();
+        var context = runtime.getCurrentContext();
 
         if (node.body != null) {
             node.body.accept(new AbstractNodeVisitor<Object>() {
@@ -47,10 +54,10 @@ public class LazyMethodDefinitionPrism implements LazyMethodDefinition<Node, Def
                 protected Object defaultVisit(Node node) {
                     if (node == null) return null;
 
-                    if (node instanceof InstanceVariableReadNode) {
-                        ivarNames.add(((InstanceVariableReadNode) node).name.idString());
-                    } else if (node instanceof InstanceVariableWriteNode) {
-                        ivarNames.add(((InstanceVariableWriteNode) node).name.idString());
+                    if (node instanceof InstanceVariableReadNode ivar) {
+                        ivarNames.add(asSymbol(context, new ByteList(ivar.name, encoding)).idString());
+                    } else if (node instanceof InstanceVariableWriteNode ivar) {
+                        ivarNames.add(asSymbol(context, new ByteList(ivar.name, encoding)).idString());
                     }
 
                     Node[] children = node.childNodes();

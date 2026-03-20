@@ -2,10 +2,15 @@ package org.jruby.prism.parser;
 
 import org.jcodings.Encoding;
 import org.jruby.ParseResult;
+import org.jruby.Ruby;
+import org.jruby.RubySymbol;
 import org.jruby.prism.builder.IRBuilderPrism;
 import org.jruby.parser.StaticScope;
 import org.jruby.runtime.DynamicScope;
+import org.jruby.util.ByteList;
 import org.ruby_lang.prism.Nodes;
+
+import static org.jruby.api.Convert.asSymbol;
 
 public class ParseResultPrism implements ParseResult {
     final Encoding encoding;
@@ -16,11 +21,13 @@ public class ParseResultPrism implements ParseResult {
     final String fileName;
     final byte[] source;
     final int coverageMode;
+    final Ruby runtime;
 
     DynamicScope toplevelScope;
 
-    public ParseResultPrism(String fileName, byte[] source, Nodes.ProgramNode root, Nodes.Source nodeSource,
-                            Encoding encoding, int coverageMode) {
+    public ParseResultPrism(Ruby runtime, String fileName, byte[] source, Nodes.ProgramNode root,
+                            Nodes.Source nodeSource, Encoding encoding, int coverageMode) {
+        this.runtime = runtime;
         this.root = root;
         this.fileName = fileName;
         this.source = source;
@@ -43,7 +50,7 @@ public class ParseResultPrism implements ParseResult {
     @Override
     public StaticScope getStaticScope() {
         if (rootScope == null) {
-            rootScope = IRBuilderPrism.createStaticScopeFrom(fileName, root.locals, StaticScope.Type.LOCAL, null);
+            rootScope = IRBuilderPrism.createStaticScopeFrom(fileName, symbols(root.locals), StaticScope.Type.LOCAL, null);
             toplevelScope = DynamicScope.newDynamicScope(rootScope);
         }
 
@@ -87,5 +94,14 @@ public class ParseResultPrism implements ParseResult {
 
     public Encoding getEncoding() {
         return encoding;
+    }
+
+    public RubySymbol[] symbols(byte[][] tokens) {
+        var context = runtime.getCurrentContext();
+        var names = new RubySymbol[tokens.length];
+        for (int i = 0; i < tokens.length; i++) {
+            names[i] = asSymbol(context, new ByteList(tokens[i], encoding));
+        }
+        return names;
     }
 }
