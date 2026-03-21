@@ -81,7 +81,7 @@ public abstract class ParserPrismBase extends Parser {
         if (res.errors != null && res.errors.length > 0) {
             int line = res.source.line(res.errors[0].location.startOffset);
 
-            throw runtime.newSyntaxError(fileName + ":" + line + ": " + res.errors[0].message);
+            throw runtime.newSyntaxError(fileName + ":" + line + ": " + res.errors[0].message, fileName);
         }
 
         if (type == MAIN && res.dataLocation != null) {
@@ -165,7 +165,7 @@ public abstract class ParserPrismBase extends Parser {
             data.readFully(source);
             return source;
         } catch (IOException e) {
-            throw runtime.newSyntaxError("Failed to read source file: " + fileName);
+            throw runtime.newSyntaxError("Failed to read source file: " + fileName, fileName);
         }
     }
 
