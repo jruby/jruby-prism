@@ -1748,17 +1748,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             addArgumentDescription(ArgumentType.nokey, null);
             // I don't think we need to slurp up anything to **nil so no recv instr here.
         } else if (parameters.keyword_rest instanceof KeywordRestParameterNode kwrest) {
-            RubySymbol key;
-            ArgumentType type;
-            if (kwrest.name == null) {
-                key = symbol(STAR_STAR);
-                type = ArgumentType.anonkeyrest;
-            } else {
-                key = symbol(kwrest.name);
-                type = ArgumentType.keyrest;
-            }
-
-            addArgumentDescription(type, key);
+            RubySymbol key = kwrest.name == null ? symbol(STAR_STAR) : symbol(kwrest.name);
+            addArgumentDescription(ArgumentType.keyrest, key);
 
             addInstr(new ReceiveKeywordRestArgInstr(getNewLocalVariable(key, 0), keywords));
         }
@@ -2149,14 +2140,8 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             RubySymbol argName;
 
             if (args.rest instanceof RestParameterNode restArg) {
-                    // FIXME: how do we annotate generated AST types to have isAnonymous etc...
-                if (restArg.name == null) {
-                    argName = symbol("*");
-                    addArgumentDescription(ArgumentType.anonrest, argName);
-                } else {
-                    argName = symbol(restArg.name);
-                    addArgumentDescription(ArgumentType.rest, argName);
-                }
+                argName = restArg.name == null ? symbol("*") : symbol(restArg.name);
+                addArgumentDescription(ArgumentType.rest, argName);
             } else { // ImplicitRestNode  (*,)
                 argName = null;
             }
