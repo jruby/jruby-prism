@@ -7,7 +7,6 @@ import org.jruby.Ruby;
 import org.jruby.RubyArray;
 import org.jruby.RubyFile;
 import org.jruby.RubyInstanceConfig;
-import org.jruby.RubySymbol;
 import org.jruby.ext.coverage.CoverageData;
 import org.jruby.management.ParserStats;
 import org.jruby.parser.Parser;
@@ -199,14 +198,25 @@ public abstract class ParserPrismBase extends Parser {
             evalScopesRecursive(scope.getEnclosingScope(), scopes);
         }
 
+        var variables = scope.getVariables();
+
         scopes.add(new ParsingOptions.Scope(
                 Arrays
-                        .stream(scope.getVariables())
+                        .stream(variables)
                         .map(String::getBytes)
                         .toArray(byte[][]::new),
                 IntStream
                         .range(0, scope.getVariables().length)
-                        .mapToObj((i) -> ParsingOptions.Forwarding.NONE)
+                        .mapToObj((i) -> {
+                            var name = variables[i];
+                            return switch (name) {
+                                case "..." -> ParsingOptions.Forwarding.ALL;
+                                case "*" -> ParsingOptions.Forwarding.POSITIONAL;
+                                case "**" -> ParsingOptions.Forwarding.KEYWORD;
+                                case "&" -> ParsingOptions.Forwarding.BLOCK;
+                                default -> ParsingOptions.Forwarding.NONE;
+                            };
+                        })
                         .toArray(ParsingOptions.Forwarding[]::new)));
     }
 

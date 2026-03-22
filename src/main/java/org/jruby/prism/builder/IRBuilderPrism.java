@@ -704,7 +704,12 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                     flags[0] |= CALL_SPLATS;
                     builtArgs[i] = new Splat(addResultInstr(new BuildSplatInstr(temp(), build(splat), true)));
                 } else {
-                    builtArgs[i] = new Splat(scope.lookupExistingLVar(symbol("*")));
+                    // Note: WOOF.  Prism forwarding returns '*' as an expressless splat instead of a splat
+                    // of a lvar named '*'.  IRScope cannot give us the power to search assuming this is all
+                    // going to be handed to it by the parser so we need to look it up in StaticScope.
+                    var slot = scope.getStaticScope().isDefined("*");
+                    var lvar = new LocalVariable(symbol("*"), slot >> 16, slot & 0xffff, true);
+                    builtArgs[i] = new Splat(lvar);
                 }
             } else if (child instanceof KeywordHashNode hash && i == numberOfArgs - 1) {
                 builtArgs[i] = buildCallKeywordArguments(hash, flags); // FIXME: here and possibly AST make isKeywordsHash() method.
@@ -1885,8 +1890,12 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             var pair = (AssocSplatNode) pairs[0];
 
             if (pair.value == null) {
-                return scope.lookupExistingLVar(symbol("**"));
-            } else {
+                // Note: WOOF.  Prism forwarding returns '**' as an expressless splat instead of a splat
+                // of a lvar named '**'.  IRScope cannot give us the power to search assuming this is all
+                // going to be handed to it by the parser so we need to look it up in StaticScope.
+                var slot = scope.getStaticScope().isDefined("**");
+                return new LocalVariable(symbol("**"), slot >> 16, slot & 0xffff, true);
+             } else {
                 Operand splat = buildWithOrder(pair.value, containsVariableAssignment);
 
                 return addResultInstr(new RuntimeHelperCall(temp(), HASH_CHECK, new Operand[]{splat}));
