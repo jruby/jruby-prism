@@ -704,11 +704,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                     flags[0] |= CALL_SPLATS;
                     builtArgs[i] = new Splat(addResultInstr(new BuildSplatInstr(temp(), build(splat), true)));
                 } else {
-                    // Note: WOOF.  Prism forwarding returns '*' as an expressless splat instead of a splat
-                    // of a lvar named '*'.  IRScope cannot give us the power to search assuming this is all
-                    // going to be handed to it by the parser so we need to look it up in StaticScope.
-                    var slot = scope.getStaticScope().isDefined("*");
-                    var lvar = new LocalVariable(symbol("*"), slot >> 16, slot & 0xffff, true);
+                    var lvar = getLocalVariable(symbol("*"), scope.getStaticScope().isDefined("*"));
                     builtArgs[i] = new Splat(lvar);
                 }
             } else if (child instanceof KeywordHashNode hash && i == numberOfArgs - 1) {
@@ -1709,6 +1705,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         if (parameters.keyword_rest instanceof ForwardingParameterNode) {
             Variable keywords = addResultInstr(new ReceiveKeywordsInstr(temp(), true, true));
             receiveNonBlockArgs(parameters, keywords, true);
+            argumentResult(symbol(FWD_ALL)); // Dummy placeholder so eval parses know this is a forward all
             RubySymbol restName = symbol(FWD_REST);
             RubySymbol kwrestName = symbol(FWD_KWREST);
             RubySymbol blockName = symbol(FWD_BLOCK);
@@ -1890,11 +1887,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             var pair = (AssocSplatNode) pairs[0];
 
             if (pair.value == null) {
-                // Note: WOOF.  Prism forwarding returns '**' as an expressless splat instead of a splat
-                // of a lvar named '**'.  IRScope cannot give us the power to search assuming this is all
-                // going to be handed to it by the parser so we need to look it up in StaticScope.
-                var slot = scope.getStaticScope().isDefined("**");
-                return new LocalVariable(symbol("**"), slot >> 16, slot & 0xffff, true);
+                return getLocalVariable(symbol("**"), scope.getStaticScope().isDefined("**"));
              } else {
                 Operand splat = buildWithOrder(pair.value, containsVariableAssignment);
 
