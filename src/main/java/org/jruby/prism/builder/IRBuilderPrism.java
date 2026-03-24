@@ -2796,11 +2796,12 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
 
     protected RubySymbol symbol(SymbolNode node) {
-        short flags = node.flags;
-        Encoding encoding = SymbolFlags.isForcedUsAsciiEncoding(flags) ? USASCIIEncoding.INSTANCE :
-                SymbolFlags.isForcedUtf8Encoding(flags) ? UTF8Encoding.INSTANCE :
-                        SymbolFlags.isForcedBinaryEncoding(flags) ? ASCIIEncoding.INSTANCE :
-                                getEncoding();
+        var encoding = switch(node.flags) {
+            case SymbolFlags.FORCED_BINARY_ENCODING -> ASCIIEncoding.INSTANCE;
+            case SymbolFlags.FORCED_US_ASCII_ENCODING -> USASCIIEncoding.INSTANCE;
+            case SymbolFlags.FORCED_UTF8_ENCODING ->  UTF8Encoding.INSTANCE;
+            default -> getEncoding();
+        };
         ByteList bytelist = new ByteList(node.unescaped, encoding);
 
         // FIXME: This should be done by prism.
