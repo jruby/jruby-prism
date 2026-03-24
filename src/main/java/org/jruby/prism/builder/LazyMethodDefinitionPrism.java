@@ -2,6 +2,7 @@ package org.jruby.prism.builder;
 
 import org.jcodings.Encoding;
 import org.jruby.Ruby;
+import org.jruby.RubySymbol;
 import org.jruby.ir.IRManager;
 import org.jruby.ir.IRMethod;
 import org.jruby.ir.builder.IRBuilder;
@@ -19,6 +20,7 @@ import org.ruby_lang.prism.Nodes.RescueNode;
 import org.ruby_lang.prism.Nodes.WhenNode;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
 
 import static org.jruby.api.Convert.asSymbol;
@@ -28,15 +30,18 @@ public class LazyMethodDefinitionPrism implements LazyMethodDefinition<Node, Def
     private final Nodes.Source nodeSource;
     private DefNode node;
     private byte[] source;
+    private IdentityHashMap<byte[], RubySymbol> symbols;
 
     final private Encoding encoding;
 
-    public LazyMethodDefinitionPrism(Ruby runtime, byte[] source, Nodes.Source nodeSource, Encoding encoding, DefNode node) {
+    public LazyMethodDefinitionPrism(Ruby runtime, byte[] source, Nodes.Source nodeSource, Encoding encoding,
+                                     DefNode node, IdentityHashMap<byte[], RubySymbol> symbols) {
         this.runtime = runtime;
         this.source = source;
         this.node = node;
         this.nodeSource = nodeSource;
         this.encoding = encoding;
+        this.symbols = symbols;
     }
     @Override
     public int getEndLine() {
@@ -89,6 +94,7 @@ public class LazyMethodDefinitionPrism implements LazyMethodDefinition<Node, Def
     public IRBuilder<Node, DefNode, WhenNode, RescueNode, ConstantPathNode, Nodes.HashPatternNode> getBuilder(IRManager manager, IRMethod methodScope) {
         IRBuilder<Node, DefNode, WhenNode, RescueNode, ConstantPathNode, Nodes.HashPatternNode> builder = manager.getBuilderFactory().newIRBuilder(manager, methodScope, null, encoding);
 
+        ((IRBuilderPrism) builder).setSymbols(symbols);
         ((IRBuilderPrism) builder).setSourceFrom(nodeSource, source);
 
         return builder;

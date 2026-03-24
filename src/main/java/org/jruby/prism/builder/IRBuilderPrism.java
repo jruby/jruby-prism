@@ -92,7 +92,10 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     byte[] source;
     Nodes.Source nodeSource;
     StaticScope staticScope;
-    IdentityHashMap<byte[], RubySymbol> symbols = new IdentityHashMap<>();
+    // This is originally sourced from ParseResult so that we only resolve symbols once per result instead of
+    // one per scope.  There is a little dance to set this ... we keep getting it from the parent scope
+    // unless it is a method definition then we get reference from the lazymethoddefinition.
+    IdentityHashMap<byte[], RubySymbol> symbols = null;
     ThreadContext context;
 
     public IRBuilderPrism(IRManager manager, IRScope scope, IRBuilder parent, IRBuilder variableBuilder, Encoding encoding) {
@@ -101,10 +104,17 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         if (parent != null) {
             source = ((IRBuilderPrism) parent).source;
             nodeSource = ((IRBuilderPrism) parent).nodeSource;
+            symbols = ((IRBuilderPrism) parent).symbols;
+        } else { // For END which is made without a parent and not setup by lazy method def.
+            symbols = new IdentityHashMap<>();
         }
         staticScope = scope.getStaticScope();
         staticScope.setFile(scope.getFile()); // staticScope and IRScope contain the same field.
         context = manager.getRuntime().getCurrentContext();
+    }
+
+    public void setSymbols(IdentityHashMap<byte[], RubySymbol> symbols) {
+        this.symbols = symbols;
     }
 
     // FIXME: Delete once we are no longer depedent on source code
@@ -130,6 +140,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         this.executesOnce = false;
         this.source = ((ParseResultPrism) result).getSource();
         this.nodeSource = ((ParseResultPrism) result).getSourceNode();
+        this.symbols = ((ParseResultPrism) result).getSymbols();
 
 //        System.out.println("NAME: " + fileName);
 //        System.out.println(((ParseResultPrism) result).getRoot());
@@ -899,7 +910,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         // FIXME: due to how lazy methods work we need this set on method before we actually parse the method.
         StaticScope staticScope = createStaticScopeFrom(node.locals, StaticScope.Type.LOCAL);
         staticScope.setSignature(calculateSignature(node.parameters));
-        LazyMethodDefinition def = new LazyMethodDefinitionPrism(getManager().getRuntime(), source, nodeSource, encoding, node);
+        LazyMethodDefinition def = new LazyMethodDefinitionPrism(getManager().getRuntime(), source, nodeSource, encoding, node, symbols);
 
         if (node.receiver == null) {
             return buildDefn(defineNewMethod(def, symbol(node.name).getBytes(), getLine(node), staticScope, true));
@@ -2860,6 +2871,21 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
     }
     
     private RubySymbol symbol(byte[] bytes) {
+        /*
+        var hit = symbols.get(bytes);
+
+        if (hit == null) {
+            hit = asSymbol(context, new ByteList(bytes, encoding));
+            if (hit.idString().charAt(0) == 'R') {
+                System.out.println("SAVING: " + hit + ", ENC: " + encoding);
+            }
+            symbols.put(bytes, hit);
+        } else {
+            //System.out.println("ALREADY FOUND: " + hit);
+        }
+
+        return hit;
+         */
         return symbols.computeIfAbsent(bytes, (_b) -> asSymbol(context, new ByteList(bytes, encoding)));
     }
 

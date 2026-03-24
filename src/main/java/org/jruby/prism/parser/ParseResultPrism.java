@@ -10,12 +10,15 @@ import org.jruby.runtime.DynamicScope;
 import org.jruby.util.ByteList;
 import org.ruby_lang.prism.Nodes;
 
+import java.util.IdentityHashMap;
+
 import static org.jruby.api.Convert.asSymbol;
 
 public class ParseResultPrism implements ParseResult {
     final Encoding encoding;
     StaticScope rootScope;
     Nodes.ProgramNode root;
+    IdentityHashMap<byte[], RubySymbol> symbols = new IdentityHashMap<>();
 
     final Nodes.Source nodeSource;
     final String fileName;
@@ -71,6 +74,10 @@ public class ParseResultPrism implements ParseResult {
     @Override
     public int getCoverageMode() {
         return coverageMode;
+    }
+
+    public IdentityHashMap<byte[], RubySymbol> getSymbols() {
+        return symbols;
     }
 
     public Nodes.ProgramNode getRoot() {
