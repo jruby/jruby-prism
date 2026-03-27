@@ -499,6 +499,11 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         }
     }
 
+    private void markIt(StaticScope staticScope) {
+        int slot = staticScope.existsOrImplicit("it");
+        staticScope.markImplicitVariable(slot & 0xffff);
+    }
+
     protected Variable receiveBlockArg(Variable v, Operand argsArray, int argIndex, boolean isSplat) {
         if (argsArray != null) {
             // We are in a nested receive situation -- when we are not at the root of a masgn tree
@@ -559,6 +564,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         } else if (node instanceof ItParametersNode) {
             Variable keywords = addResultInstr(new ReceiveKeywordsInstr(temp(), true, true));
             Variable v = getLocalVariable(symbol("it"), 0);
+            markIt(staticScope);
             addInstr(new ReceivePreReqdArgInstr(v, keywords, 0));
         } else if (node instanceof BlockParametersNode params) {
             // FIXME: Missing locals?  Not sure how we handle those but I would have thought with a scope?
@@ -2744,12 +2750,10 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
     public static StaticScope createStaticScopeFrom(String fileName, RubySymbol[] symbols, StaticScope.Type type, StaticScope parent) {
         String[] strings = new String[symbols.length];
-        // FIXME: this should be iso_8859_1 strings and not default charset.
         for(int i = 0; i < symbols.length; i++) {
             strings[i] = symbols[i].idString();
         }
 
-        // FIXME: keywordArgIndex?
         return StaticScopeFactory.newStaticScope(parent, type, fileName, strings, -1);
     }
 
