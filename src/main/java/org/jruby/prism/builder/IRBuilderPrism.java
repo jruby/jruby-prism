@@ -565,6 +565,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             Variable keywords = addResultInstr(new ReceiveKeywordsInstr(temp(), true, true));
             Variable v = getLocalVariable(symbol("it"), 0);
             markIt(staticScope);
+            ((IRClosure) scope).setArgumentDescriptors(new ArgumentDescriptor[] { new ArgumentDescriptor(ArgumentType.anonreq) });
             addInstr(new ReceivePreReqdArgInstr(v, keywords, 0));
         } else if (node instanceof BlockParametersNode params) {
             // FIXME: Missing locals?  Not sure how we handle those but I would have thought with a scope?
