@@ -508,8 +508,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         if (argsArray != null) {
             // We are in a nested receive situation -- when we are not at the root of a masgn tree
             // Ex: We are trying to receive (b,c) in this example: "|a, (b,c), d| = ..."
-            if (isSplat) addInstr(new RestArgMultipleAsgnInstr(v, argsArray, argIndex));
-            else addInstr(new ReqdArgMultipleAsgnInstr(v, argsArray, argIndex));
+            addInstr(new RestArgMultipleAsgnInstr(v, argsArray, argIndex));
         } else {
             // argsArray can be null when the first node in the args-node-ast is a multiple-assignment
             // For example, for-nodes
