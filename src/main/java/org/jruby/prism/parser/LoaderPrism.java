@@ -2,7 +2,6 @@ package org.jruby.prism.parser;
 
 import org.jcodings.Encoding;
 import org.jruby.Ruby;
-import org.jruby.util.ByteList;
 import org.ruby_lang.prism.Loader;
 import org.ruby_lang.prism.ParseResult;
 
