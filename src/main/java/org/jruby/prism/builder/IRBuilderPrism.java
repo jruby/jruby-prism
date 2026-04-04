@@ -494,13 +494,13 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
 
     private void markImplcitNums(StaticScope staticScope, int maximum) {
         for (int i = 0; i < maximum; i++) {
-            int slot = staticScope.existsOrImplicit("_" + (i + 1));
+            int slot = staticScope.exists("_" + (i + 1));
             staticScope.markImplicitVariable(slot & 0xffff);
         }
     }
 
     private void markIt(StaticScope staticScope) {
-        int slot = staticScope.existsOrImplicit("it");
+        int slot = staticScope.exists("it");
         staticScope.markImplicitVariable(slot & 0xffff);
     }
 
