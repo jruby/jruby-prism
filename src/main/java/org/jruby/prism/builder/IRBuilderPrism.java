@@ -203,6 +203,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             case EmbeddedVariableNode n -> build(n.variable);
             // EmbeddedStatementsNode handle in interpolated processing
             // EnsureNode - covered by BeginNode and DefNode
+            case ErrorRecoveryNode n -> buildErrorRecoveryNode(n);
             case FalseNode n -> fals();
             // MISSING: FindPatternNode
             case FloatNode n -> buildFloat(n);
@@ -249,7 +250,6 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
             case MatchPredicateNode n -> buildMatchPredicate(n);
             case MatchRequiredNode n -> buildMatchRequired(n);
             case MatchWriteNode n -> buildMatchWrite(result, n);
-            case MissingNode n -> buildMissing(n);
             case ModuleNode n -> buildModule(n);
             // MultiTargetNode handled a few places internally
             case MultiWriteNode n -> buildMultiWriteOrTargetNode(n.lefts, n.rest, n.rights, n.value);
@@ -933,6 +933,11 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         return buildStatements(node.statements);
     }
 
+    private Operand buildErrorRecoveryNode(ErrorRecoveryNode node) {
+        System.out.println("uh oh");
+        return nil();
+    }
+
     private Operand buildFlipFlop(FlipFlopNode node) {
         return buildFlip(node.left, node.right, node.isExcludeEnd());
     }
@@ -1556,11 +1561,6 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
         }
 
         return result;
-    }
-
-    private Operand buildMissing(MissingNode node) {
-        System.out.println("uh oh");
-        return nil();
     }
 
     private Operand buildModule(ModuleNode node) {
