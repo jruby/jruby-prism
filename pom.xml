@@ -6,6 +6,7 @@
   <packaging>jar</packaging>
   <version>2.0.0</version>
   <name>jruby-prism</name>
+  <url>https://github.com/jruby/jruby-prism</url>
   <description>
     Java portion of JRuby Prism parser support.
   </description>
