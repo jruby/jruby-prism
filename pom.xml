@@ -16,6 +16,7 @@
     <junit.version>5.12.1</junit.version>
     <maven.compiler.source>21</maven.compiler.source>
     <maven.compiler.target>21</maven.compiler.target>
+    <prism.parser.version>0.0.3</prism.parser.version>
   </properties>
 
   <issueManagement>
@@ -67,12 +68,12 @@
     <dependency>
       <groupId>org.ruby-lang</groupId>
       <artifactId>prism-parser-api</artifactId>
-      <version>0.0.2</version>
+      <version>${prism.parser.version}</version>
     </dependency>
     <dependency>
       <groupId>org.ruby-lang</groupId>
       <artifactId>prism-parser-wasm</artifactId>
-      <version>0.0.2</version>
+      <version>${prism.parser.version}</version>
     </dependency>
   </dependencies>
 
