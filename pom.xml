@@ -16,7 +16,7 @@
     <junit.version>5.12.1</junit.version>
     <maven.compiler.source>21</maven.compiler.source>
     <maven.compiler.target>21</maven.compiler.target>
-    <prism.parser.version>0.0.3</prism.parser.version>
+    <prism.parser.version>0.0.4</prism.parser.version>
   </properties>
 
   <issueManagement>
