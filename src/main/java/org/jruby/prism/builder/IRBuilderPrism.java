@@ -2532,6 +2532,7 @@ public class IRBuilderPrism extends IRBuilder<Node, DefNode, WhenNode, RescueNod
                 // FIXME: only build literals (which are guaranteed to build without raising).
                 Operand key = build(assoc.key);
                 call(result, d, "key?", key);
+                copy(errorString, key); // Sets to symbol which will not be nil or a regular string.
                 cond_ne_true(testEnd, result);
 
                 String method = hasRest ? "delete" : "[]";
